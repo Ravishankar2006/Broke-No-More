@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../providers/xp_engine_provider.dart';
+import '../../shared_widgets/badge_unlock_dialog.dart';
 import '../insights/insights_screen.dart';
 import '../log_transaction/log_transaction_sheet.dart';
 import '../profile/profile_screen.dart';
@@ -26,11 +28,15 @@ class _HomeShellState extends State<HomeShell> {
   ];
 
   Future<void> _openLogSheet() async {
-    await showModalBottomSheet(
+    final result = await showModalBottomSheet<LogTransactionResult>(
       context: context,
       isScrollControlled: true,
       builder: (_) => const LogTransactionSheet(),
     );
+    if (!mounted || result == null || result.newlyUnlockedBadges.isEmpty) {
+      return;
+    }
+    await showBadgeUnlockDialog(context, result.newlyUnlockedBadges);
   }
 
   @override

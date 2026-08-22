@@ -34,7 +34,7 @@ class _LogTransactionSheetState extends ConsumerState<LogTransactionSheet> {
     if (amount == null || amount <= 0 || _category == null || _saving) return;
 
     setState(() => _saving = true);
-    await ref.read(xpEngineOrchestratorProvider).logTransaction(
+    final result = await ref.read(xpEngineOrchestratorProvider).logTransaction(
           amount: amount,
           type: _type,
           category: _category!.name,
@@ -44,7 +44,7 @@ class _LogTransactionSheetState extends ConsumerState<LogTransactionSheet> {
           timestamp: DateTime.now(),
         );
     if (!mounted) return;
-    Navigator.of(context).pop();
+    Navigator.of(context).pop(result);
   }
 
   @override

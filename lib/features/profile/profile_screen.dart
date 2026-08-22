@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/utils/badge_engine.dart';
 import '../../core/utils/csv_export.dart';
 import '../../core/utils/xp_engine.dart';
+import '../../providers/badge_provider.dart';
 import '../../providers/profile_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/transaction_provider.dart';
@@ -63,6 +65,8 @@ class ProfileScreen extends ConsumerWidget {
     }
 
     final progress = levelProgressForXp(profile.currentXP);
+    final unlockedBadgeCount = ref.watch(badgesProvider).length;
+    final badgeCatalogSize = kBadgeCatalog.length;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Profile')),
@@ -102,9 +106,9 @@ class ProfileScreen extends ConsumerWidget {
                   leading: const Icon(Icons.emoji_events_outlined),
                   title: const Text('Badges'),
                   subtitle: Text(
-                    profile.badgeIds.isEmpty
-                        ? 'None yet — keep logging to unlock some'
-                        : '${profile.badgeIds.length} unlocked',
+                    unlockedBadgeCount == 0
+                        ? 'None yet — see the shelf on the Quests tab'
+                        : '$unlockedBadgeCount of $badgeCatalogSize unlocked · see them on the Quests tab',
                   ),
                 ),
                 const Divider(height: 1),

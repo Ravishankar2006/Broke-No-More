@@ -19,6 +19,7 @@ class UserProfile extends HiveObject {
     this.streakFreezesLeft = 1,
     DateTime? lastFreezeResetDate,
     this.lastBudgetBonusDate,
+    this.daysUnderBudgetCount = 0,
   })  : lastLoggedDate = lastLoggedDate ?? joinDate,
         badgeIds = badgeIds ?? <String>[],
         lastFreezeResetDate = lastFreezeResetDate ?? joinDate;
@@ -69,6 +70,12 @@ class UserProfile extends HiveObject {
   @HiveField(13)
   DateTime? lastBudgetBonusDate;
 
+  /// Total number of distinct days the budget bonus has ever been awarded —
+  /// drives the "Budget Boss" badge. Not a PRD field; added to make that
+  /// badge's unlock condition checkable.
+  @HiveField(14)
+  int daysUnderBudgetCount;
+
   UserProfile copyWith({
     String? name,
     String? avatarId,
@@ -82,6 +89,7 @@ class UserProfile extends HiveObject {
     int? streakFreezesLeft,
     DateTime? lastFreezeResetDate,
     DateTime? lastBudgetBonusDate,
+    int? daysUnderBudgetCount,
   }) {
     return UserProfile(
       id: id,
@@ -98,6 +106,7 @@ class UserProfile extends HiveObject {
       streakFreezesLeft: streakFreezesLeft ?? this.streakFreezesLeft,
       lastFreezeResetDate: lastFreezeResetDate ?? this.lastFreezeResetDate,
       lastBudgetBonusDate: lastBudgetBonusDate ?? this.lastBudgetBonusDate,
+      daysUnderBudgetCount: daysUnderBudgetCount ?? this.daysUnderBudgetCount,
     );
   }
 }

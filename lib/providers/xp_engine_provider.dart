@@ -1,23 +1,40 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/utils/badge_engine.dart';
 import '../core/utils/date_helpers.dart';
 import '../core/utils/quest_engine.dart';
 import '../core/utils/xp_engine.dart';
+import '../models/quest.dart';
 import '../models/transaction.dart';
+import 'badge_provider.dart';
 import 'profile_provider.dart';
 import 'quest_provider.dart';
 import 'transaction_provider.dart';
 
+/// Result of logging a transaction — lets the UI react to badge unlocks
+/// (e.g. a celebration) without the orchestrator knowing about widgets.
+class LogTransactionResult {
+  const LogTransactionResult({
+    required this.transaction,
+    required this.xpGained,
+    required this.newlyUnlockedBadges,
+  });
+
+  final Transaction transaction;
+  final int xpGained;
+  final List<BadgeDefinition> newlyUnlockedBadges;
+}
+
 /// Orchestrates the "log a transaction" flow described in the PRD (section
-/// 8): save the transaction, run the pure XP/streak/quest engines against
-/// it, persist the results, and update every dependent provider so Home,
-/// Profile and Quests screens rebuild reactively from one action.
+/// 8): save the transaction, run the pure XP/streak/quest/badge engines
+/// against it, persist the results, and update every dependent provider so
+/// Home, Profile and Quests screens rebuild reactively from one action.
 class XpEngineOrchestrator {
   XpEngineOrchestrator(this._ref);
 
   final Ref _ref;
 
-  Future<Transaction> logTransaction({
+  Future<LogTransactionResult> logTransaction({
     required double amount,
     required TransactionType type,
     required String category,
@@ -39,7 +56,7 @@ class XpEngineOrchestrator {
     );
     _ref.read(transactionsProvider.notifier).refresh();
 
-    var profile = _ref.read(profileProvider);
+    final profile = _ref.read(profileProvider);
     if (profile == null) {
       throw StateError('logTransaction called before a profile exists');
     }
@@ -69,6 +86,7 @@ class XpEngineOrchestrator {
 
     final spentToday = transactionRepo.totalSpentForDay(now);
     var lastBudgetBonusDate = profile.lastBudgetBonusDate;
+    var daysUnderBudgetCount = profile.daysUnderBudgetCount;
     if (shouldAwardDailyBudgetBonus(
       monthlyBudget: profile.monthlyBudget,
       spentToday: spentToday,
@@ -77,12 +95,29 @@ class XpEngineOrchestrator {
     )) {
       xpGained += kUnderBudgetXp;
       lastBudgetBonusDate = now;
+      daysUnderBudgetCount += 1;
     }
 
     final newXp = profile.currentXP + xpGained;
+    final newLevel = levelForXp(newXp);
+
+    await _updateQuestProgress(
+      transaction: transaction,
+      streak: streakResult.newStreak,
+      today: now,
+    );
+
+    final newlyUnlockedBadges = await _unlockEligibleBadges(
+      transactionCount: transactionRepo.getAll().length,
+      currentStreak: streakResult.newStreak,
+      level: newLevel,
+      daysUnderBudget: daysUnderBudgetCount,
+      now: now,
+    );
+
     final updatedProfile = profile.copyWith(
       currentXP: newXp,
-      level: levelForXp(newXp),
+      level: newLevel,
       currentStreak: streakResult.newStreak,
       longestStreak: streakResult.newStreak > profile.longestStreak
           ? streakResult.newStreak
@@ -91,17 +126,19 @@ class XpEngineOrchestrator {
       streakFreezesLeft: streakResult.freezesLeft,
       lastFreezeResetDate: freezeResetDate,
       lastBudgetBonusDate: lastBudgetBonusDate,
+      daysUnderBudgetCount: daysUnderBudgetCount,
+      badgeIds: newlyUnlockedBadges.isEmpty
+          ? profile.badgeIds
+          : [...profile.badgeIds, ...newlyUnlockedBadges.map((b) => b.id)],
     );
     await profileRepo.save(updatedProfile);
     _ref.read(profileProvider.notifier).setProfile(updatedProfile);
 
-    await _updateQuestProgress(
+    return LogTransactionResult(
       transaction: transaction,
-      streak: streakResult.newStreak,
-      today: now,
+      xpGained: xpGained,
+      newlyUnlockedBadges: newlyUnlockedBadges,
     );
-
-    return transaction;
   }
 
   Future<void> _updateQuestProgress({
@@ -139,6 +176,36 @@ class XpEngineOrchestrator {
       await quest.save();
     }
     _ref.read(questsProvider.notifier).refresh();
+  }
+
+  Future<List<BadgeDefinition>> _unlockEligibleBadges({
+    required int transactionCount,
+    required int currentStreak,
+    required int level,
+    required int daysUnderBudget,
+    required DateTime now,
+  }) async {
+    final badgeRepo = _ref.read(badgeRepositoryProvider);
+    final questRepo = _ref.read(questRepositoryProvider);
+    final questsCompleted =
+        questRepo.getAll().where((q) => q.status == QuestStatus.completed).length;
+
+    final newlyUnlocked = evaluateNewlyUnlockedBadges(
+      transactionCount: transactionCount,
+      currentStreak: currentStreak,
+      level: level,
+      questsCompleted: questsCompleted,
+      daysUnderBudget: daysUnderBudget,
+      alreadyUnlockedIds: badgeRepo.unlockedIds,
+    );
+
+    for (final def in newlyUnlocked) {
+      await badgeRepo.unlock(def, now: now);
+    }
+    if (newlyUnlocked.isNotEmpty) {
+      _ref.read(badgesProvider.notifier).refresh();
+    }
+    return newlyUnlocked;
   }
 }
 
