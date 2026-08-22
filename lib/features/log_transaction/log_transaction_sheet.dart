@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/utils/categories.dart';
+import '../../core/utils/category_icons.dart';
+import '../../models/category_record.dart';
 import '../../models/transaction.dart';
+import '../../providers/category_provider.dart';
 import '../../providers/xp_engine_provider.dart';
 
 class LogTransactionSheet extends ConsumerStatefulWidget {
@@ -16,11 +18,8 @@ class _LogTransactionSheetState extends ConsumerState<LogTransactionSheet> {
   final _amountController = TextEditingController();
   final _noteController = TextEditingController();
   TransactionType _type = TransactionType.expense;
-  SpendCategory? _category;
+  CategoryRecord? _category;
   bool _saving = false;
-
-  List<SpendCategory> get _categories =>
-      _type == TransactionType.expense ? kExpenseCategories : kIncomeCategories;
 
   @override
   void dispose() {
@@ -49,6 +48,10 @@ class _LogTransactionSheetState extends ConsumerState<LogTransactionSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final categories = _type == TransactionType.expense
+        ? ref.watch(expenseCategoriesProvider)
+        : ref.watch(incomeCategoriesProvider);
+
     return Padding(
       padding: EdgeInsets.only(
         left: 20,
@@ -110,10 +113,10 @@ class _LogTransactionSheetState extends ConsumerState<LogTransactionSheet> {
           Wrap(
             spacing: 10,
             runSpacing: 10,
-            children: _categories.map((category) {
-              final selected = category.name == _category?.name;
+            children: categories.map((category) {
+              final selected = category.id == _category?.id;
               return ChoiceChip(
-                avatar: Icon(category.icon, size: 18),
+                avatar: Icon(categoryIcon(category.iconId), size: 18),
                 label: Text(category.name),
                 selected: selected,
                 onSelected: (_) => setState(() => _category = category),

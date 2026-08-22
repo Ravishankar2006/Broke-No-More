@@ -10,6 +10,7 @@ import '../../providers/profile_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/transaction_provider.dart';
 import '../../shared_widgets/xp_bar.dart';
+import 'category_management_screen.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -152,6 +153,17 @@ class ProfileScreen extends ConsumerWidget {
                       : 'Not set'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => _editBudget(context, ref),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.category_outlined),
+                  title: const Text('Manage categories'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const CategoryManagementScreen(),
+                    ),
+                  ),
                 ),
                 const Divider(height: 1),
                 SwitchListTile(

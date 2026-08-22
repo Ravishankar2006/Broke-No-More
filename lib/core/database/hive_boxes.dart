@@ -1,6 +1,7 @@
 import 'package:hive_flutter/hive_flutter.dart';
 
 import '../../models/badge.dart';
+import '../../models/category_record.dart';
 import '../../models/quest.dart';
 import '../../models/transaction.dart';
 import '../../models/user_profile.dart';
@@ -11,6 +12,7 @@ abstract class HiveBoxes {
   static const String profile = 'profile';
   static const String quests = 'quests';
   static const String badges = 'badges';
+  static const String categories = 'categories';
 }
 
 /// Registers all Hive adapters and opens every box used by the app.
@@ -25,11 +27,65 @@ Future<void> initHive() async {
   Hive.registerAdapter(QuestStatusAdapter());
   Hive.registerAdapter(QuestAdapter());
   Hive.registerAdapter(BadgeAdapter());
+  Hive.registerAdapter(CategoryRecordAdapter());
 
   await Future.wait([
     Hive.openBox<Transaction>(HiveBoxes.transactions),
     Hive.openBox<UserProfile>(HiveBoxes.profile),
     Hive.openBox<Quest>(HiveBoxes.quests),
     Hive.openBox<Badge>(HiveBoxes.badges),
+    Hive.openBox<CategoryRecord>(HiveBoxes.categories),
   ]);
+
+  await _seedDefaultCategoriesIfEmpty();
+}
+
+/// First-run seed so the log-transaction grid isn't empty before the user
+/// has ever touched Profile > Manage categories. Mirrors the category set
+/// finalized for the log-transaction grid (PRD section 11).
+Future<void> _seedDefaultCategoriesIfEmpty() async {
+  final box = Hive.box<CategoryRecord>(HiveBoxes.categories);
+  if (box.isNotEmpty) return;
+
+  const expenseDefaults = [
+    ('Food', 'restaurant'),
+    ('Groceries', 'groceries'),
+    ('Transport', 'transport'),
+    ('Shopping', 'shopping'),
+    ('Entertainment', 'movie'),
+    ('Subscriptions', 'subscriptions'),
+    ('Bills & Utilities', 'bills'),
+    ('Rent & Housing', 'home'),
+    ('Health', 'health'),
+    ('Education', 'education'),
+    ('Other', 'other'),
+  ];
+  const incomeDefaults = [
+    ('Allowance', 'wallet'),
+    ('Salary', 'work'),
+    ('Freelance', 'laptop'),
+    ('Gift', 'gift'),
+    ('Other', 'other'),
+  ];
+
+  var order = 0;
+  for (final (name, iconId) in expenseDefaults) {
+    await box.add(CategoryRecord(
+      id: 'seed-expense-$order',
+      name: name,
+      iconId: iconId,
+      type: TransactionType.expense,
+      sortOrder: order++,
+    ));
+  }
+  order = 0;
+  for (final (name, iconId) in incomeDefaults) {
+    await box.add(CategoryRecord(
+      id: 'seed-income-$order',
+      name: name,
+      iconId: iconId,
+      type: TransactionType.income,
+      sortOrder: order++,
+    ));
+  }
 }
