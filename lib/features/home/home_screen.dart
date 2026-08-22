@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/theme/app_dimens.dart';
+import '../../core/theme/app_semantic_colors.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/xp_engine.dart';
 import '../../providers/profile_provider.dart';
@@ -13,6 +15,7 @@ class HomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final semantics = context.semantics;
     final profile = ref.watch(profileProvider);
     final transactions = ref.watch(transactionsProvider);
     final spentToday = ref.watch(todaysSpendProvider);
@@ -28,19 +31,19 @@ class HomeScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: Text('Hey, ${profile.name}')),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(Spacing.lg),
         children: [
           Card(
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.all(Spacing.lg),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.local_fire_department,
-                          color: Colors.deepOrange),
-                      const SizedBox(width: 8),
+                      Icon(Icons.local_fire_department,
+                          color: semantics.streakInk),
+                      SizedBox(width: Spacing.sm),
                       Text(
                         '${profile.currentStreak}-day streak',
                         style: Theme.of(context).textTheme.titleMedium,
@@ -50,45 +53,52 @@ class HomeScreen extends ConsumerWidget {
                           style: Theme.of(context).textTheme.bodySmall),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: Spacing.lg),
                   StreakCalendar(transactions: transactions),
                 ],
               ),
             ),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: Spacing.md),
           Card(
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.all(Spacing.lg),
               child: XpBar(progress: progress),
             ),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: Spacing.md),
           Card(
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.all(Spacing.lg),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text("Today's spending",
                       style: Theme.of(context).textTheme.titleMedium),
-                  const SizedBox(height: 8),
+                  SizedBox(height: Spacing.sm),
                   Text(
                     dailyBudget != null
                         ? '${formatCurrency(spentToday)} / ${formatCurrency(dailyBudget)}'
                         : formatCurrency(spentToday),
-                    style: Theme.of(context).textTheme.headlineSmall,
+                    style: Theme.of(context).textTheme.headlineSmall!.copyWith(
+                          color: spentToday > (dailyBudget ?? 0)
+                              ? semantics.expenseInk
+                              : null,
+                        ),
                   ),
                   if (dailyBudget != null) ...[
-                    const SizedBox(height: 8),
+                    SizedBox(height: Spacing.sm),
                     ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(AppRadius.pill),
                       child: LinearProgressIndicator(
                         value: (spentToday / dailyBudget).clamp(0, 1),
                         minHeight: 8,
-                        color: spentToday > dailyBudget
-                            ? Colors.red
-                            : Theme.of(context).colorScheme.primary,
+                        backgroundColor: semantics.barTrack,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          spentToday > dailyBudget
+                              ? semantics.budgetOver
+                              : semantics.budgetUnder,
+                        ),
                       ),
                     ),
                   ],

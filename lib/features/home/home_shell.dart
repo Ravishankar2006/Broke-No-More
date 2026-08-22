@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/theme/app_dimens.dart';
 import '../../core/notifications/streak_reminder_service.dart';
 import '../../core/utils/date_helpers.dart';
 import '../../providers/profile_provider.dart';
@@ -72,7 +73,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       bottomNavigationBar: BottomAppBar(
         shape: const CircularNotchedRectangle(),
-        notchMargin: 8,
+        notchMargin: 10,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
@@ -88,7 +89,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
               selected: _index == 1,
               onTap: () => setState(() => _index = 1),
             ),
-            const SizedBox(width: 48),
+            SizedBox(width: Spacing.xxxl),
             _NavButton(
               icon: Icons.flag_rounded,
               label: 'Quests',
@@ -123,20 +124,41 @@ class _NavButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = selected
-        ? Theme.of(context).colorScheme.primary
-        : Theme.of(context).colorScheme.onSurfaceVariant;
+    final cs = Theme.of(context).colorScheme;
+    final iconColor = selected ? cs.onSecondaryContainer : cs.onSurfaceVariant;
     return InkWell(
       onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color),
-            Text(label, style: TextStyle(color: color, fontSize: 11)),
-          ],
-        ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Animated pill background
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            width: 56,
+            height: 28,
+            decoration: BoxDecoration(
+              color: selected ? cs.secondaryContainer : Colors.transparent,
+              borderRadius: BorderRadius.circular(AppRadius.pill),
+            ),
+          ),
+          // Icon + label
+          Padding(
+            padding: EdgeInsets.symmetric(vertical: Spacing.xs, horizontal: Spacing.sm),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, color: iconColor, size: 20),
+                Text(
+                  label,
+                  style: Theme.of(context).textTheme.labelSmall!.copyWith(
+                        color: iconColor,
+                        fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                      ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
