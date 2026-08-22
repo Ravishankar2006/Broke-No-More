@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/theme/app_dimens.dart';
+import '../../core/theme/app_semantic_colors.dart';
 import '../../providers/profile_provider.dart';
 
 const _avatarIds = ['🦊', '🐼', '🐨', '🐸', '🦉', '🐢'];
@@ -40,37 +42,37 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: EdgeInsets.all(Spacing.xl),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 24),
+              SizedBox(height: Spacing.xl),
               Text('Welcome to Broke No More',
                   style: Theme.of(context).textTheme.headlineSmall),
-              const SizedBox(height: 8),
+              SizedBox(height: Spacing.sm),
               Text(
                 'Log spending, build a streak, level up. Takes less than a minute to set up.',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
-              const SizedBox(height: 32),
+              SizedBox(height: Spacing.xl),
               Text('What should we call you?',
                   style: Theme.of(context).textTheme.titleSmall),
-              const SizedBox(height: 8),
+              SizedBox(height: Spacing.sm),
               TextField(
                 controller: _nameController,
                 decoration: const InputDecoration(
                   hintText: 'Your name',
-                  border: OutlineInputBorder(),
                 ),
               ),
-              const SizedBox(height: 24),
+              SizedBox(height: Spacing.xl),
               Text('Pick an avatar', style: Theme.of(context).textTheme.titleSmall),
-              const SizedBox(height: 8),
+              SizedBox(height: Spacing.sm),
               Wrap(
-                spacing: 12,
+                spacing: Spacing.md,
                 children: _avatarIds.map((avatar) {
                   final selected = avatar == _selectedAvatar;
                   return ChoiceChip(
@@ -80,48 +82,52 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   );
                 }).toList(),
               ),
-              const SizedBox(height: 24),
+              SizedBox(height: Spacing.xl),
               Text('Monthly budget (optional)',
                   style: Theme.of(context).textTheme.titleSmall),
-              const SizedBox(height: 8),
+              SizedBox(height: Spacing.sm),
               TextField(
                 controller: _budgetController,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 decoration: const InputDecoration(
                   prefixText: '₹ ',
                   hintText: 'e.g. 8000',
-                  border: OutlineInputBorder(),
                 ),
               ),
-              const SizedBox(height: 32),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.bolt, color: Colors.amber),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'Every logged transaction earns XP. Log daily to build a streak — '
-                          'levels get harder to reach the further you go.',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
+              SizedBox(height: Spacing.xl),
+              Container(
+                decoration: BoxDecoration(
+                  color: cs.tertiaryContainer,
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
+                ),
+                padding: EdgeInsets.all(Spacing.lg),
+                child: Row(
+                  children: [
+                    Icon(Icons.bolt, color: context.semantics.goldInk),
+                    SizedBox(width: Spacing.md),
+                    Expanded(
+                      child: Text(
+                        'Every logged transaction earns XP. Log daily to build a streak — '
+                        'levels get harder to reach the further you go.',
+                        style: Theme.of(context).textTheme.bodySmall,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 32),
+              SizedBox(height: Spacing.xl),
               SizedBox(
                 width: double.infinity,
                 child: FilledButton(
                   onPressed: _saving ? null : _submit,
                   child: _saving
-                      ? const SizedBox(
+                      ? SizedBox(
                           height: 20,
                           width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(cs.onTertiary),
+                          ),
                         )
                       : const Text('Get started'),
                 ),

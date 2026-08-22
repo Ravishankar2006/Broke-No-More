@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/theme/app_dimens.dart';
 import '../../core/utils/category_icons.dart';
 import '../../models/category_record.dart';
 import '../../models/transaction.dart';
@@ -71,7 +72,7 @@ class _CategoryManagementScreenState
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            padding: EdgeInsets.fromLTRB(Spacing.lg, Spacing.lg, Spacing.lg, Spacing.sm),
             child: SegmentedButton<TransactionType>(
               segments: const [
                 ButtonSegment(
@@ -90,7 +91,7 @@ class _CategoryManagementScreenState
           ),
           Expanded(
             child: ReorderableListView.builder(
-              padding: const EdgeInsets.symmetric(vertical: 8),
+              padding: EdgeInsets.symmetric(vertical: Spacing.sm),
               itemCount: categories.length,
               onReorderItem: (oldIndex, newIndex) =>
                   _reorder(categories, oldIndex, newIndex),
@@ -160,17 +161,17 @@ class _CategoryEditorDialogState extends State<_CategoryEditorDialog> {
               autofocus: true,
               decoration: const InputDecoration(labelText: 'Name'),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: Spacing.lg),
             Text('Icon', style: Theme.of(context).textTheme.titleSmall),
-            const SizedBox(height: 8),
+            SizedBox(height: Spacing.sm),
             Wrap(
-              spacing: 8,
-              runSpacing: 8,
+              spacing: Spacing.sm,
+              runSpacing: Spacing.sm,
               children: kCategoryIconChoices.entries.map((entry) {
                 final selected = entry.key == _iconId;
                 return InkWell(
                   onTap: () => setState(() => _iconId = entry.key),
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
                   child: CircleAvatar(
                     radius: 20,
                     backgroundColor: selected

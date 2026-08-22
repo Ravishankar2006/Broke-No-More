@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/theme/app_dimens.dart';
 import '../../core/utils/category_icons.dart';
 import '../../models/category_record.dart';
 import '../../models/transaction.dart';
@@ -48,16 +49,17 @@ class _LogTransactionSheetState extends ConsumerState<LogTransactionSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final categories = _type == TransactionType.expense
         ? ref.watch(expenseCategoriesProvider)
         : ref.watch(incomeCategoriesProvider);
 
     return Padding(
       padding: EdgeInsets.only(
-        left: 20,
-        right: 20,
-        top: 20,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+        left: Spacing.lg,
+        right: Spacing.lg,
+        top: Spacing.lg,
+        bottom: MediaQuery.of(context).viewInsets.bottom + Spacing.lg,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -66,14 +68,14 @@ class _LogTransactionSheetState extends ConsumerState<LogTransactionSheet> {
           Center(
             child: Container(
               width: 40,
-              height: 4,
+              height: 5,
               decoration: BoxDecoration(
                 color: Theme.of(context).dividerColor,
-                borderRadius: BorderRadius.circular(2),
+                borderRadius: BorderRadius.circular(AppRadius.pill),
               ),
             ),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: Spacing.lg),
           SegmentedButton<TransactionType>(
             segments: const [
               ButtonSegment(
@@ -95,7 +97,7 @@ class _LogTransactionSheetState extends ConsumerState<LogTransactionSheet> {
               });
             },
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: Spacing.lg),
           TextField(
             controller: _amountController,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -104,15 +106,14 @@ class _LogTransactionSheetState extends ConsumerState<LogTransactionSheet> {
             decoration: const InputDecoration(
               prefixText: '₹ ',
               hintText: '0.00',
-              border: OutlineInputBorder(),
             ),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: Spacing.lg),
           Text('Category', style: Theme.of(context).textTheme.titleSmall),
-          const SizedBox(height: 8),
+          SizedBox(height: Spacing.sm),
           Wrap(
-            spacing: 10,
-            runSpacing: 10,
+            spacing: Spacing.md,
+            runSpacing: Spacing.md,
             children: categories.map((category) {
               final selected = category.id == _category?.id;
               return ChoiceChip(
@@ -123,24 +124,26 @@ class _LogTransactionSheetState extends ConsumerState<LogTransactionSheet> {
               );
             }).toList(),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: Spacing.lg),
           TextField(
             controller: _noteController,
             decoration: const InputDecoration(
               hintText: 'Note (optional)',
-              border: OutlineInputBorder(),
             ),
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: Spacing.xl),
           SizedBox(
             width: double.infinity,
             child: FilledButton(
               onPressed: _saving ? null : _submit,
               child: _saving
-                  ? const SizedBox(
+                  ? SizedBox(
                       height: 20,
                       width: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(cs.onTertiary),
+                      ),
                     )
                   : const Text('Log transaction'),
             ),
