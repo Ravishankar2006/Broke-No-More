@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/notifications/streak_reminder_service.dart';
+import '../../core/utils/date_helpers.dart';
+import '../../providers/profile_provider.dart';
 import '../../providers/xp_engine_provider.dart';
 import '../../shared_widgets/badge_unlock_dialog.dart';
 import '../../shared_widgets/level_up_dialog.dart';
@@ -11,15 +15,29 @@ import 'home_screen.dart';
 
 /// Bottom-nav shell wiring the four main tabs plus the log-transaction FAB,
 /// per the core user flow in the PRD (section 4).
-class HomeShell extends StatefulWidget {
+class HomeShell extends ConsumerStatefulWidget {
   const HomeShell({super.key});
 
   @override
-  State<HomeShell> createState() => _HomeShellState();
+  ConsumerState<HomeShell> createState() => _HomeShellState();
 }
 
-class _HomeShellState extends State<HomeShell> {
+class _HomeShellState extends ConsumerState<HomeShell> {
   int _index = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // Re-arm tonight's streak reminder on every app open — cheap, and
+    // means a killed/reinstalled app doesn't leave a stale schedule.
+    Future.microtask(() {
+      final profile = ref.read(profileProvider);
+      if (profile == null || !profile.remindersEnabled) return;
+      if (isSameDay(profile.lastLoggedDate, DateTime.now())) return;
+      StreakReminderService.instance
+          .scheduleTonightReminder(currentStreak: profile.currentStreak);
+    });
+  }
 
   static const _tabs = [
     HomeScreen(),

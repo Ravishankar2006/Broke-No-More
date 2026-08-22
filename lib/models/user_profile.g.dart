@@ -32,13 +32,14 @@ class UserProfileAdapter extends TypeAdapter<UserProfile> {
       lastFreezeResetDate: fields[12] as DateTime?,
       lastBudgetBonusDate: fields[13] as DateTime?,
       daysUnderBudgetCount: fields[14] as int,
+      remindersEnabled: fields[15] as bool?,
     );
   }
 
   @override
   void write(BinaryWriter writer, UserProfile obj) {
     writer
-      ..writeByte(15)
+      ..writeByte(16)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -68,7 +69,9 @@ class UserProfileAdapter extends TypeAdapter<UserProfile> {
       ..writeByte(13)
       ..write(obj.lastBudgetBonusDate)
       ..writeByte(14)
-      ..write(obj.daysUnderBudgetCount);
+      ..write(obj.daysUnderBudgetCount)
+      ..writeByte(15)
+      ..write(obj.remindersEnabled);
   }
 
   @override

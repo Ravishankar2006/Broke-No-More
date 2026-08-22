@@ -1,4 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Runtime-requested only when the user turns on Streak reminders in
+         Profile — see StreakReminderService. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
         android:label="broke_no_more"
         android:name="${applicationName}"

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/notifications/streak_reminder_service.dart';
 import '../../core/utils/badge_engine.dart';
 import '../../core/utils/csv_export.dart';
 import '../../core/utils/xp_engine.dart';
@@ -42,6 +43,37 @@ class ProfileScreen extends ConsumerWidget {
     );
     if (result == null) return;
     final updated = profile.copyWith(monthlyBudget: result);
+    await ref.read(profileRepositoryProvider).save(updated);
+    ref.read(profileProvider.notifier).setProfile(updated);
+  }
+
+  Future<void> _toggleReminders(
+    BuildContext context,
+    WidgetRef ref,
+    bool enabled,
+  ) async {
+    final profile = ref.read(profileProvider);
+    if (profile == null) return;
+
+    if (enabled) {
+      final granted = await StreakReminderService.instance.requestPermission();
+      if (!granted) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Notification permission was not granted.'),
+            ),
+          );
+        }
+        return;
+      }
+      await StreakReminderService.instance
+          .scheduleTonightReminder(currentStreak: profile.currentStreak);
+    } else {
+      await StreakReminderService.instance.cancelToday();
+    }
+
+    final updated = profile.copyWith(remindersEnabled: enabled);
     await ref.read(profileRepositoryProvider).save(updated);
     ref.read(profileProvider.notifier).setProfile(updated);
   }
@@ -127,6 +159,17 @@ class ProfileScreen extends ConsumerWidget {
                   title: const Text('Dark mode'),
                   value: themeMode == ThemeMode.dark,
                   onChanged: (_) => ref.read(themeModeProvider.notifier).toggle(),
+                ),
+                const Divider(height: 1),
+                SwitchListTile(
+                  secondary: const Icon(Icons.notifications_outlined),
+                  title: const Text('Streak reminders'),
+                  subtitle: const Text(
+                    "A nudge in the evening if you haven't logged yet",
+                  ),
+                  value: profile.remindersEnabled,
+                  onChanged: (enabled) =>
+                      _toggleReminders(context, ref, enabled),
                 ),
                 const Divider(height: 1),
                 ListTile(

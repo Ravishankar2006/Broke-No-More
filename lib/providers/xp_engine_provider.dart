@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/notifications/streak_reminder_service.dart';
 import '../core/utils/badge_engine.dart';
 import '../core/utils/date_helpers.dart';
 import '../core/utils/quest_engine.dart';
@@ -137,6 +138,11 @@ class XpEngineOrchestrator {
     );
     await profileRepo.save(updatedProfile);
     _ref.read(profileProvider.notifier).setProfile(updatedProfile);
+
+    if (updatedProfile.remindersEnabled) {
+      // Today's streak is safe now — don't nag the user this evening.
+      await StreakReminderService.instance.cancelToday();
+    }
 
     return LogTransactionResult(
       transaction: transaction,

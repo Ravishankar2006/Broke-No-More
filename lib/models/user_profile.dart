@@ -20,9 +20,14 @@ class UserProfile extends HiveObject {
     DateTime? lastFreezeResetDate,
     this.lastBudgetBonusDate,
     this.daysUnderBudgetCount = 0,
+    bool? remindersEnabled,
   })  : lastLoggedDate = lastLoggedDate ?? joinDate,
         badgeIds = badgeIds ?? <String>[],
-        lastFreezeResetDate = lastFreezeResetDate ?? joinDate;
+        lastFreezeResetDate = lastFreezeResetDate ?? joinDate,
+        // Nullable here (unlike the other defaulted fields above) so Hive
+        // records saved before this field existed deserialize as `false`
+        // instead of throwing on a missing key.
+        remindersEnabled = remindersEnabled ?? false;
 
   @HiveField(0)
   String id;
@@ -76,6 +81,13 @@ class UserProfile extends HiveObject {
   @HiveField(14)
   int daysUnderBudgetCount;
 
+  /// Opt-in for the local "keep your streak alive" reminder (PRD section
+  /// 10 — optional v1.1). Off by default: requesting the OS notification
+  /// permission unprompted at first launch is bad practice, so this only
+  /// flips on when the user explicitly enables it from Profile.
+  @HiveField(15)
+  bool remindersEnabled;
+
   UserProfile copyWith({
     String? name,
     String? avatarId,
@@ -90,6 +102,7 @@ class UserProfile extends HiveObject {
     DateTime? lastFreezeResetDate,
     DateTime? lastBudgetBonusDate,
     int? daysUnderBudgetCount,
+    bool? remindersEnabled,
   }) {
     return UserProfile(
       id: id,
@@ -107,6 +120,7 @@ class UserProfile extends HiveObject {
       lastFreezeResetDate: lastFreezeResetDate ?? this.lastFreezeResetDate,
       lastBudgetBonusDate: lastBudgetBonusDate ?? this.lastBudgetBonusDate,
       daysUnderBudgetCount: daysUnderBudgetCount ?? this.daysUnderBudgetCount,
+      remindersEnabled: remindersEnabled ?? this.remindersEnabled,
     );
   }
 }
