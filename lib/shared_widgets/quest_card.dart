@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../core/theme/app_dimens.dart';
+import '../core/theme/app_semantic_colors.dart';
 import '../data/quest_repository.dart';
 import '../models/quest.dart';
 
@@ -11,28 +13,32 @@ class QuestCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final semantics = context.semantics;
     final fraction =
         quest.targetValue == 0 ? 0.0 : quest.currentProgress / quest.targetValue;
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(Spacing.lg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(quest.title, style: Theme.of(context).textTheme.titleSmall),
-            const SizedBox(height: 8),
+            SizedBox(height: Spacing.sm),
             ClipRRect(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(AppRadius.pill),
               child: LinearProgressIndicator(value: fraction.clamp(0, 1)),
             ),
-            const SizedBox(height: 6),
+            SizedBox(height: Spacing.xs),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text('${quest.currentProgress} / ${quest.targetValue}',
                     style: Theme.of(context).textTheme.bodySmall),
                 Text('+${quest.xpReward} XP',
-                    style: Theme.of(context).textTheme.bodySmall),
+                    style: Theme.of(context).textTheme.bodySmall!.copyWith(
+                          color: semantics.goldInk,
+                          fontWeight: FontWeight.w700,
+                        )),
               ],
             ),
           ],
@@ -57,22 +63,26 @@ class QuestCandidateCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final semantics = context.semantics;
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(Spacing.lg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(candidate.title, style: Theme.of(context).textTheme.titleSmall),
-            const SizedBox(height: 4),
+            SizedBox(height: Spacing.xs),
             Text('+${candidate.xpReward} XP',
-                style: Theme.of(context).textTheme.bodySmall),
-            const SizedBox(height: 12),
+                style: Theme.of(context).textTheme.bodySmall!.copyWith(
+                      color: semantics.goldInk,
+                      fontWeight: FontWeight.w700,
+                    )),
+            SizedBox(height: Spacing.md),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 TextButton(onPressed: onSkip, child: const Text('Skip')),
-                const SizedBox(width: 8),
+                SizedBox(width: Spacing.sm),
                 FilledButton(onPressed: onAccept, child: const Text('Accept')),
               ],
             ),

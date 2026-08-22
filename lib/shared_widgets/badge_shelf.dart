@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../core/theme/app_dimens.dart';
+import '../core/theme/app_semantic_colors.dart';
 import '../core/utils/badge_engine.dart';
 import '../core/utils/badge_icons.dart';
 import '../models/badge.dart' as model;
@@ -15,14 +17,15 @@ class BadgeShelf extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final unlockedIds = unlockedBadges.map((b) => b.id).toSet();
+    final semantics = context.semantics;
     final colorScheme = Theme.of(context).colorScheme;
 
     return SizedBox(
-      height: 92,
+      height: 96,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: kBadgeCatalog.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 12),
+        separatorBuilder: (_, _) => SizedBox(width: Spacing.md),
         itemBuilder: (context, index) {
           final def = kBadgeCatalog[index];
           final unlocked = unlockedIds.contains(def.id);
@@ -31,19 +34,29 @@ class BadgeShelf extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                CircleAvatar(
-                  radius: 26,
-                  backgroundColor: unlocked
-                      ? colorScheme.primary.withValues(alpha: 0.15)
-                      : colorScheme.surfaceContainerHighest,
-                  child: Icon(
-                    unlocked ? badgeIcon(def.iconId) : Icons.lock_outline,
+                Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
                     color: unlocked
-                        ? colorScheme.primary
-                        : colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                        ? semantics.xp.withValues(alpha: 0.15)
+                        : colorScheme.surfaceContainerHigh,
+                    border: unlocked
+                        ? Border.all(color: semantics.xp.withValues(alpha: 0.4), width: 1.5)
+                        : null,
+                  ),
+                  child: Center(
+                    child: Icon(
+                      unlocked ? badgeIcon(def.iconId) : Icons.lock_outline,
+                      color: unlocked
+                          ? semantics.goldInk
+                          : colorScheme.onSurfaceVariant.withValues(alpha: 0.45),
+                      size: 28,
+                    ),
                   ),
                 ),
-                const SizedBox(height: 6),
+                SizedBox(height: Spacing.sm),
                 SizedBox(
                   width: 64,
                   child: Text(
