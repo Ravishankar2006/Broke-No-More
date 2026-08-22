@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/theme/app_dimens.dart';
+import '../../core/theme/app_semantic_colors.dart';
 import '../../core/notifications/streak_reminder_service.dart';
 import '../../core/utils/badge_engine.dart';
 import '../../core/utils/csv_export.dart';
@@ -101,18 +103,30 @@ class ProfileScreen extends ConsumerWidget {
     final unlockedBadgeCount = ref.watch(badgesProvider).length;
     final badgeCatalogSize = kBadgeCatalog.length;
 
+    final semantics = context.semantics;
     return Scaffold(
       appBar: AppBar(title: const Text('Profile')),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(Spacing.lg),
         children: [
           Row(
             children: [
-              CircleAvatar(
-                radius: 32,
-                child: Text(profile.avatarId, style: const TextStyle(fontSize: 28)),
+              Container(
+                width: 76,
+                height: 76,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: semantics.xp.withValues(alpha: 0.5),
+                    width: 2,
+                  ),
+                ),
+                child: Center(
+                  child: Text(profile.avatarId,
+                      style: const TextStyle(fontSize: 28)),
+                ),
               ),
-              const SizedBox(width: 16),
+              SizedBox(width: Spacing.lg),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -123,14 +137,14 @@ class ProfileScreen extends ConsumerWidget {
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: Spacing.xl),
           Card(
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.all(Spacing.lg),
               child: XpBar(progress: progress),
             ),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: Spacing.md),
           Card(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

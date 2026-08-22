@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/theme/app_dimens.dart';
 import '../../providers/badge_provider.dart';
 import '../../providers/quest_provider.dart';
 import '../../providers/transaction_provider.dart';
@@ -42,34 +43,39 @@ class _QuestsScreenState extends ConsumerState<QuestsScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Quests')),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(Spacing.lg),
         children: [
           Card(
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.all(Spacing.lg),
               child: StreakCalendar(transactions: transactions),
             ),
           ),
-          const SizedBox(height: 16),
-          Text('Badges', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 8),
+          SizedBox(height: Spacing.xl),
+          Text('Badges',
+              style: Theme.of(context).textTheme.titleMedium!
+                  .copyWith(color: Theme.of(context).colorScheme.primary)),
+          SizedBox(height: Spacing.sm),
           BadgeShelf(unlockedBadges: unlockedBadges),
-          const SizedBox(height: 16),
+          SizedBox(height: Spacing.xl),
           if (activeQuests.isNotEmpty) ...[
-            Text('Active', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
+            Text('Active',
+                style: Theme.of(context).textTheme.titleMedium!
+                    .copyWith(color: Theme.of(context).colorScheme.primary)),
+            SizedBox(height: Spacing.sm),
             ...activeQuests.map((q) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
+                  padding: EdgeInsets.only(bottom: Spacing.md),
                   child: QuestCard(quest: q),
                 )),
-            const SizedBox(height: 16),
+            SizedBox(height: Spacing.xl),
           ],
           if (candidates.isNotEmpty) ...[
             Text('Suggested for you',
-                style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
+                style: Theme.of(context).textTheme.titleMedium!
+                    .copyWith(color: Theme.of(context).colorScheme.primary)),
+            SizedBox(height: Spacing.sm),
             ...candidates.map((c) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
+                  padding: EdgeInsets.only(bottom: Spacing.md),
                   child: QuestCandidateCard(
                     candidate: c,
                     onAccept: () => ref.read(questsProvider.notifier).accept(c),
@@ -79,7 +85,7 @@ class _QuestsScreenState extends ConsumerState<QuestsScreen> {
           ],
           if (activeQuests.isEmpty && candidates.isEmpty)
             Padding(
-              padding: const EdgeInsets.only(top: 48),
+              padding: EdgeInsets.only(top: Spacing.xxxl),
               child: Center(
                 child: Text(
                   'Keep logging transactions — quest suggestions show up once '
