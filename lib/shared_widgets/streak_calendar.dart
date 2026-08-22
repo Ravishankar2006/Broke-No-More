@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../core/theme/app_colors.dart';
+import '../core/theme/app_dimens.dart';
+import '../core/theme/app_semantic_colors.dart';
 import '../core/utils/date_helpers.dart';
 import '../models/transaction.dart';
 
@@ -18,6 +19,7 @@ class StreakCalendar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final semantics = context.semantics;
     final today = DateTime.now();
     final loggedDays = transactions.map((t) => startOfDay(t.timestamp)).toSet();
 
@@ -34,15 +36,21 @@ class StreakCalendar extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: logged
-                    ? AppColors.streak
-                    : AppColors.streak.withValues(alpha: 0.12),
+                    ? semantics.streak
+                    : semantics.streakTrack,
+                border: !logged
+                    ? Border.all(
+                        color: semantics.streak.withValues(alpha: 0.35),
+                        width: 1,
+                      )
+                    : null,
               ),
               child: logged
-                  ? const Icon(Icons.local_fire_department,
-                      color: Colors.white, size: 16)
+                  ? Icon(Icons.local_fire_department,
+                      color: semantics.onGold, size: 16)
                   : null,
             ),
-            const SizedBox(height: 4),
+            SizedBox(height: Spacing.xs),
             Text(
               _weekdayLabel(day.weekday),
               style: Theme.of(context).textTheme.labelSmall,

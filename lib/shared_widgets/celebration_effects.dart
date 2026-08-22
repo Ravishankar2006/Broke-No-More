@@ -3,14 +3,7 @@ import 'dart:math';
 import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
 
-import '../core/theme/app_colors.dart';
-
-const _confettiColors = [
-  AppColors.primary,
-  AppColors.secondary,
-  AppColors.xp,
-  AppColors.streak,
-];
+import '../core/theme/app_semantic_colors.dart';
 
 /// Wraps a celebration dialog's content with a one-shot confetti burst that
 /// plays as soon as it appears — shared by the level-up and badge-unlock
@@ -43,6 +36,12 @@ class _CelebrationBurstState extends State<CelebrationBurst> {
 
   @override
   Widget build(BuildContext context) {
+    final confettiColors = [
+      Theme.of(context).colorScheme.primary,
+      context.semantics.xp,
+      Theme.of(context).colorScheme.primary.withValues(alpha: 0.7),
+      context.semantics.xp.withValues(alpha: 0.7),
+    ];
     return Stack(
       alignment: Alignment.topCenter,
       clipBehavior: Clip.none,
@@ -60,7 +59,7 @@ class _CelebrationBurstState extends State<CelebrationBurst> {
               minBlastForce: 7,
               gravity: 0.35,
               shouldLoop: false,
-              colors: _confettiColors,
+              colors: confettiColors,
             ),
           ),
         ),

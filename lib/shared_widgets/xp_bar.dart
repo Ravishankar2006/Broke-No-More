@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../core/theme/app_colors.dart';
+import '../core/theme/app_dimens.dart';
+import '../core/theme/app_semantic_colors.dart';
 import '../core/utils/xp_engine.dart';
 
 class XpBar extends StatelessWidget {
@@ -10,6 +11,7 @@ class XpBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final semantics = context.semantics;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -24,14 +26,14 @@ class XpBar extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 6),
+        SizedBox(height: Spacing.sm),
         ClipRRect(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(AppRadius.pill),
           child: LinearProgressIndicator(
             value: progress.fraction.clamp(0, 1),
             minHeight: 10,
-            backgroundColor: AppColors.xp.withValues(alpha: 0.15),
-            valueColor: const AlwaysStoppedAnimation<Color>(AppColors.xp),
+            backgroundColor: semantics.xpTrack,
+            valueColor: AlwaysStoppedAnimation<Color>(semantics.xp),
           ),
         ),
       ],
