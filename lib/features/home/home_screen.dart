@@ -42,7 +42,7 @@ class HomeScreen extends ConsumerWidget {
                   Row(
                     children: [
                       Icon(Icons.local_fire_department,
-                          color: semantics.streakInk),
+                          color: semantics.goldInk),
                       SizedBox(width: Spacing.sm),
                       Text(
                         '${profile.currentStreak}-day streak',

@@ -322,7 +322,6 @@ class _WeekStat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final semantics = context.semantics;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

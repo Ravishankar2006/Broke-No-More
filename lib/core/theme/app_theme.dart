@@ -88,9 +88,8 @@ abstract class AppTheme {
       ),
       progressIndicatorTheme: ProgressIndicatorThemeData(
         color: cs.tertiary, // gold
-        linearTrackColor: cs.extension<AppSemanticColors>()!.barTrack,
         linearMinHeight: 8,
-        borderRadius: Radius.circular(AppRadius.pill),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
         circularTrackColor: Colors.transparent,
         strokeWidth: 3,
         strokeCap: StrokeCap.round,

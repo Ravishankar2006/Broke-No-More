@@ -150,8 +150,8 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
   }
 }
 
-/// Convenience extension: context.semantics instead of
-/// Theme.of(context).extension<AppSemanticColors>()!
+/// Convenience extension: `context.semantics` instead of
+/// `Theme.of(context).extension<AppSemanticColors>()!`
 extension AppSemanticColorsX on BuildContext {
   AppSemanticColors get semantics =>
       Theme.of(this).extension<AppSemanticColors>()!;
