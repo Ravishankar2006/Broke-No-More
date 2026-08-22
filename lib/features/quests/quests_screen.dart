@@ -19,6 +19,17 @@ class _QuestsScreenState extends ConsumerState<QuestsScreen> {
   final Set<String> _skippedTitles = {};
 
   @override
+  void initState() {
+    super.initState();
+    // Also check on screen open, not just app startup, so a quest that
+    // expires mid-session doesn't linger as "active" until next launch.
+    Future.microtask(() async {
+      await ref.read(questRepositoryProvider).expireOverdueQuests();
+      if (mounted) ref.read(questsProvider.notifier).refresh();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final activeQuests = ref.watch(activeQuestsProvider);
     final candidates = ref

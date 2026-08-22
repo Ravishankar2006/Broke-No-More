@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../providers/xp_engine_provider.dart';
 import '../../shared_widgets/badge_unlock_dialog.dart';
+import '../../shared_widgets/level_up_dialog.dart';
 import '../insights/insights_screen.dart';
 import '../log_transaction/log_transaction_sheet.dart';
 import '../profile/profile_screen.dart';
@@ -33,9 +34,12 @@ class _HomeShellState extends State<HomeShell> {
       isScrollControlled: true,
       builder: (_) => const LogTransactionSheet(),
     );
-    if (!mounted || result == null || result.newlyUnlockedBadges.isEmpty) {
-      return;
+    if (!mounted || result == null) return;
+
+    if (result.leveledUpTo != null) {
+      await showLevelUpDialog(context, result.leveledUpTo!);
     }
+    if (!mounted || result.newlyUnlockedBadges.isEmpty) return;
     await showBadgeUnlockDialog(context, result.newlyUnlockedBadges);
   }
 

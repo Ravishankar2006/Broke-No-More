@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/database/hive_boxes.dart';
 import 'core/theme/app_theme.dart';
+import 'data/quest_repository.dart';
 import 'features/home/home_shell.dart';
 import 'features/onboarding/onboarding_screen.dart';
 import 'providers/profile_provider.dart';
@@ -11,6 +12,9 @@ import 'providers/theme_provider.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initHive();
+  // Catches quests that passed their endDate while the app was closed —
+  // nothing else runs while offline, so this is the one guaranteed checkpoint.
+  await QuestRepository().expireOverdueQuests();
   runApp(const ProviderScope(child: BrokeNoMoreApp()));
 }
 

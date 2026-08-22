@@ -18,11 +18,15 @@ class LogTransactionResult {
     required this.transaction,
     required this.xpGained,
     required this.newlyUnlockedBadges,
+    required this.leveledUpTo,
   });
 
   final Transaction transaction;
   final int xpGained;
   final List<BadgeDefinition> newlyUnlockedBadges;
+
+  /// Non-null when this log pushed the profile to a new level.
+  final int? leveledUpTo;
 }
 
 /// Orchestrates the "log a transaction" flow described in the PRD (section
@@ -138,6 +142,7 @@ class XpEngineOrchestrator {
       transaction: transaction,
       xpGained: xpGained,
       newlyUnlockedBadges: newlyUnlockedBadges,
+      leveledUpTo: newLevel > profile.level ? newLevel : null,
     );
   }
 
