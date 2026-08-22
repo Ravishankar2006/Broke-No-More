@@ -16,6 +16,10 @@ const _categoryPalette = [
   Color(0xFF8E24AA),
   Color(0xFF00838F),
   Color(0xFF6D4C41),
+  Color(0xFFEF6C00),
+  Color(0xFF3949AB),
+  Color(0xFF2E7D32),
+  Color(0xFFAD1457),
 ];
 
 class InsightsScreen extends ConsumerWidget {
