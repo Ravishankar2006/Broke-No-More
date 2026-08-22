@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 /// Build the text theme for a given brightness. Called from app_theme.dart.
 TextTheme buildTextTheme(ColorScheme scheme, Brightness brightness) {
@@ -7,87 +8,113 @@ TextTheme buildTextTheme(ColorScheme scheme, Brightness brightness) {
       ? Typography.material2021().white
       : Typography.material2021().black;
 
+  final fontFamily = GoogleFonts.plusJakartaSans().fontFamily;
+
   final onSurface = isDark ? scheme.onSurface : scheme.onSurface;
   final onSurfaceVariant = isDark ? scheme.onSurfaceVariant : scheme.onSurfaceVariant;
 
+  // Apply font family and colors to base theme
   return base
       .apply(
         bodyColor: onSurface,
         displayColor: onSurface,
+        fontFamily: fontFamily,
       )
       .copyWith(
         // Headlines — used for large numbers (amounts, balances)
-        headlineMedium: const TextStyle(
+        headlineMedium: TextStyle(
           fontSize: 26,
           fontWeight: FontWeight.w700,
           letterSpacing: -0.4,
           height: 1.2,
-        ).copyWith(color: onSurface),
-        headlineSmall: const TextStyle(
+          fontFamily: fontFamily,
+          color: onSurface,
+        ),
+        headlineSmall: TextStyle(
           fontSize: 22,
           fontWeight: FontWeight.w700,
           letterSpacing: -0.3,
           height: 1.25,
-        ).copyWith(color: onSurface),
+          fontFamily: fontFamily,
+          color: onSurface,
+        ),
 
         // Titles
-        titleLarge: const TextStyle(
+        titleLarge: TextStyle(
           fontSize: 20,
           fontWeight: FontWeight.w700,
           letterSpacing: -0.2,
           height: 1.3,
-        ).copyWith(color: onSurface),
-        titleMedium: const TextStyle(
+          fontFamily: fontFamily,
+          color: onSurface,
+        ),
+        titleMedium: TextStyle(
           fontSize: 16,
           fontWeight: FontWeight.w600,
           letterSpacing: -0.1,
           height: 1.35,
-        ).copyWith(color: onSurface),
-        titleSmall: const TextStyle(
+          fontFamily: fontFamily,
+          color: onSurface,
+        ),
+        titleSmall: TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.w600,
           letterSpacing: 0,
           height: 1.4,
-        ).copyWith(color: onSurface),
+          fontFamily: fontFamily,
+          color: onSurface,
+        ),
 
         // Body
-        bodyLarge: const TextStyle(
+        bodyLarge: TextStyle(
           fontSize: 16,
           fontWeight: FontWeight.w400,
           letterSpacing: 0.1,
           height: 1.5,
-        ).copyWith(color: onSurface),
-        bodyMedium: const TextStyle(
+          fontFamily: fontFamily,
+          color: onSurface,
+        ),
+        bodyMedium: TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.w400,
           letterSpacing: 0.15,
           height: 1.5,
-        ).copyWith(color: onSurface),
-        bodySmall: const TextStyle(
+          fontFamily: fontFamily,
+          color: onSurface,
+        ),
+        bodySmall: TextStyle(
           fontSize: 13,
           fontWeight: FontWeight.w400,
           letterSpacing: 0.15,
           height: 1.45,
-        ).copyWith(color: onSurfaceVariant),
+          fontFamily: fontFamily,
+          color: onSurfaceVariant,
+        ),
 
         // Labels — used for buttons, chip text, nav labels, chart axis
-        labelLarge: const TextStyle(
+        labelLarge: TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.w600,
           letterSpacing: 0.1,
           height: 1.2,
-        ).copyWith(color: onSurface),
-        labelMedium: const TextStyle(
+          fontFamily: fontFamily,
+          color: onSurface,
+        ),
+        labelMedium: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w600,
           letterSpacing: 0.4,
           height: 1.2,
-        ).copyWith(color: onSurface),
-        labelSmall: const TextStyle(
+          fontFamily: fontFamily,
+          color: onSurface,
+        ),
+        labelSmall: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w600,
           letterSpacing: 0.5,
           height: 1.2,
-        ).copyWith(color: onSurfaceVariant),
+          fontFamily: fontFamily,
+          color: onSurfaceVariant,
+        ),
       );
 }
