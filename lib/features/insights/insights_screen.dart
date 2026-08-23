@@ -12,6 +12,7 @@ import '../../providers/transaction_provider.dart';
 import '../../shared_widgets/app_card.dart';
 import '../../shared_widgets/empty_state.dart';
 import '../../shared_widgets/section_header.dart';
+import '../../shared_widgets/stat_tile.dart';
 
 /// Stable hash for category-to-colour assignment. Hand-rolled djb2 (not String.hashCode,
 /// which Dart does not guarantee stable across runs/platforms).
@@ -60,19 +61,23 @@ enum InsightsRange {
   final int? days;
 }
 
-/// A bounded time window plus the expenses inside it.
+/// A bounded time window plus the transactions inside it, split by type.
 class _Window {
   const _Window({
     required this.start,
     required this.end,
     required this.expenses,
+    required this.income,
   });
 
   final DateTime start;
   final DateTime end;
   final List<Transaction> expenses;
+  final List<Transaction> income;
 
   double get total => expenses.fold<double>(0, (sum, t) => sum + t.amount);
+  double get incomeTotal => income.fold<double>(0, (sum, t) => sum + t.amount);
+  double get net => incomeTotal - total;
 
   int get dayCount => daysBetween(start, end) + 1;
 }
@@ -91,12 +96,10 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
   Widget build(BuildContext context) {
     final semantics = context.semantics;
     final transactions = ref.watch(transactionsProvider);
-    final expenses =
-        transactions.where((t) => t.type == TransactionType.expense).toList();
 
     final now = DateTime.now();
-    final current = _windowFor(expenses, now, _range);
-    final previous = _previousWindow(expenses, now, _range, current);
+    final current = _windowFor(transactions, now, _range);
+    final previous = _previousWindow(transactions, now, _range, current);
 
     final byCategory = _totalsByCategory(current);
     final categoryColors =
@@ -110,15 +113,15 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
             title: const Text('Insights'),
             titleSpacing: Spacing.lg,
           ),
-          if (expenses.isEmpty)
+          if (transactions.isEmpty)
             SliverFillRemaining(
               hasScrollBody: false,
               child: EmptyState(
                 icon: Icons.insights_rounded,
-                title: 'No spending yet',
+                title: 'Nothing logged yet',
                 message:
-                    'Log a few expenses and this fills up with category '
-                    'breakdowns and week-over-week trends.',
+                    'Log a few transactions and this fills up with category '
+                    'breakdowns, trends, and how much you\'re saving.',
               ),
             )
           else
@@ -137,6 +140,8 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                   ),
                   SizedBox(height: Spacing.lg),
                   _SummaryHero(current: current, previous: previous),
+                  SizedBox(height: Spacing.lg),
+                  _NetSummaryCard(window: current),
                   SizedBox(height: Spacing.xl),
                   SectionHeader(title: 'By category'),
                   _CategoryBreakdown(
@@ -160,7 +165,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
   /// dated in the future inflated a category past the denominator and rendered
   /// as ">100%", "NaN%" or "Infinity%".
   static _Window _windowFor(
-    List<Transaction> expenses,
+    List<Transaction> transactions,
     DateTime now,
     InsightsRange range,
   ) {
@@ -168,37 +173,60 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
     final DateTime start;
     if (range.days != null) {
       start = end.subtract(Duration(days: range.days! - 1));
-    } else if (expenses.isEmpty) {
+    } else if (transactions.isEmpty) {
       start = end;
     } else {
-      start = expenses
+      start = transactions
           .map((t) => startOfDay(t.timestamp))
           .reduce((a, b) => a.isBefore(b) ? a : b);
     }
-    return _Window(start: start, end: end, expenses: _within(expenses, start, end));
+    return _windowFromRange(transactions, start, end);
   }
 
   static _Window _previousWindow(
-    List<Transaction> expenses,
+    List<Transaction> transactions,
     DateTime now,
     InsightsRange range,
     _Window current,
   ) {
     // "All" has no meaningful previous period.
     if (range.days == null) {
-      return _Window(start: current.start, end: current.start, expenses: const []);
+      return _Window(
+        start: current.start,
+        end: current.start,
+        expenses: const [],
+        income: const [],
+      );
     }
     final end = current.start.subtract(const Duration(days: 1));
     final start = end.subtract(Duration(days: range.days! - 1));
-    return _Window(start: start, end: end, expenses: _within(expenses, start, end));
+    return _windowFromRange(transactions, start, end);
   }
 
-  static List<Transaction> _within(
-    List<Transaction> expenses,
+  static _Window _windowFromRange(
+    List<Transaction> transactions,
     DateTime start,
     DateTime end,
   ) {
-    return expenses.where((t) {
+    final inWindow = _within(transactions, start, end);
+    return _Window(
+      start: start,
+      end: end,
+      expenses: inWindow
+          .where((t) => t.type == TransactionType.expense)
+          .toList(growable: false),
+      income: inWindow
+          .where((t) => t.type == TransactionType.income)
+          .toList(growable: false),
+    );
+  }
+
+  static List<Transaction> _within(
+    List<Transaction> transactions,
+    DateTime start,
+    DateTime end,
+  ) {
+    return transactions.where((t) {
       final day = startOfDay(t.timestamp);
       return !day.isBefore(start) && !day.isAfter(end);
     }).toList(growable: false);
@@ -317,6 +345,93 @@ class _SummaryHero extends StatelessWidget {
               ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Income, expenses, and what's left over — income was logged from the
+/// start but never surfaced anywhere beyond an individual transaction row.
+class _NetSummaryCard extends StatelessWidget {
+  const _NetSummaryCard({required this.window});
+
+  final _Window window;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final semantics = context.semantics;
+
+    final income = window.incomeTotal;
+    final expense = window.total;
+    final net = window.net;
+    final netPositive = net >= 0;
+    // A rate is only meaningful once there's income to measure it against —
+    // dividing by zero income would read as either 0% or an undefined spike.
+    final savingsRate = income > 0 ? net / income * 100 : null;
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: StatTile(
+                  label: 'Income',
+                  value: formatCurrency(income),
+                  valueColor: semantics.incomeInk,
+                ),
+              ),
+              Expanded(
+                child: StatTile(
+                  label: 'Expenses',
+                  value: formatCurrency(expense),
+                  valueColor: semantics.expenseInk,
+                ),
+              ),
+              Expanded(
+                child: StatTile(
+                  label: 'Net',
+                  // Same sign convention as every transaction row: a
+                  // manually-prefixed sign over the absolute value, rather
+                  // than relying on NumberFormat's own negative rendering.
+                  value: '${netPositive ? '+' : '−'}'
+                      '${formatCurrency(net.abs())}',
+                  valueColor:
+                      netPositive ? semantics.incomeInk : semantics.expenseInk,
+                ),
+              ),
+            ],
+          ),
+          if (savingsRate != null) ...[
+            SizedBox(height: Spacing.md),
+            Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: Spacing.md,
+                vertical: Spacing.xs,
+              ),
+              decoration: BoxDecoration(
+                color: netPositive
+                    ? semantics.incomeInk.withValues(alpha: 0.12)
+                    : semantics.expenseInk.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(AppRadius.pill),
+              ),
+              child: Text(
+                netPositive
+                    ? 'Saving ${savingsRate.toStringAsFixed(0)}% of income'
+                    : 'Spending ${(-savingsRate).toStringAsFixed(0)}% more '
+                        'than income',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: netPositive
+                      ? semantics.incomeInk
+                      : semantics.expenseInk,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -569,14 +684,19 @@ class _TrendChart extends StatelessWidget {
     const weekdays = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
     final days = window.dayCount;
 
+    // Bucket once — the previous version re-scanned every expense for every
+    // day (O(days × expenses)), which on "All" over a year of history meant
+    // a few hundred full-list scans on every rebuild.
+    final totalsByDay = <DateTime, double>{};
+    for (final t in window.expenses) {
+      final day = startOfDay(t.timestamp);
+      totalsByDay[day] = (totalsByDay[day] ?? 0) + t.amount;
+    }
+
     return List.generate(days, (i) {
       final day = window.start.add(Duration(days: i));
-      final total = window.expenses
-          .where((t) => isSameDay(t.timestamp, day))
-          .fold<double>(0, (sum, t) => sum + t.amount);
-      final label =
-          days <= 7 ? weekdays[day.weekday - 1] : '${day.day}';
-      return (label: label, value: total);
+      final label = days <= 7 ? weekdays[day.weekday - 1] : '${day.day}';
+      return (label: label, value: totalsByDay[day] ?? 0);
     });
   }
 }
