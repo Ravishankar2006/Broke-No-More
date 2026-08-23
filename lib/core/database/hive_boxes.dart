@@ -3,6 +3,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import '../../models/badge.dart';
 import '../../models/category_record.dart';
 import '../../models/quest.dart';
+import '../../models/recurring_transaction.dart';
 import '../../models/transaction.dart';
 import '../../models/user_profile.dart';
 
@@ -13,6 +14,7 @@ abstract class HiveBoxes {
   static const String quests = 'quests';
   static const String badges = 'badges';
   static const String categories = 'categories';
+  static const String recurringTransactions = 'recurring_transactions';
 
   /// Untyped key/value box for small bits of app state that don't warrant a
   /// model — currently the set of quest titles the user has skipped.
@@ -32,6 +34,8 @@ Future<void> initHive() async {
   Hive.registerAdapter(QuestAdapter());
   Hive.registerAdapter(BadgeAdapter());
   Hive.registerAdapter(CategoryRecordAdapter());
+  Hive.registerAdapter(RecurrenceFrequencyAdapter());
+  Hive.registerAdapter(RecurringTransactionAdapter());
 
   await Future.wait([
     Hive.openBox<Transaction>(HiveBoxes.transactions),
@@ -39,6 +43,7 @@ Future<void> initHive() async {
     Hive.openBox<Quest>(HiveBoxes.quests),
     Hive.openBox<Badge>(HiveBoxes.badges),
     Hive.openBox<CategoryRecord>(HiveBoxes.categories),
+    Hive.openBox<RecurringTransaction>(HiveBoxes.recurringTransactions),
     Hive.openBox<dynamic>(HiveBoxes.appState),
   ]);
 

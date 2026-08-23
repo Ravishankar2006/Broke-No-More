@@ -18,6 +18,7 @@ import '../../models/transaction.dart';
 import '../../models/user_profile.dart';
 import '../../providers/badge_provider.dart';
 import '../../providers/profile_provider.dart';
+import '../../providers/recurring_transaction_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/transaction_provider.dart';
 import '../../providers/xp_engine_provider.dart';
@@ -30,6 +31,7 @@ import '../../shared_widgets/stat_tile.dart';
 import '../../shared_widgets/xp_bar.dart';
 import '../transactions/transaction_history_screen.dart';
 import 'category_management_screen.dart';
+import 'recurring_transactions_screen.dart';
 import 'edit_profile_sheet.dart';
 
 /// The avatar choices offered at onboarding and when editing a profile.
@@ -49,6 +51,10 @@ class ProfileScreen extends ConsumerWidget {
     final profile = ref.watch(profileProvider);
     final themeMode = ref.watch(themeModeProvider);
     final transactions = ref.watch(transactionsProvider);
+    final recurringCount = ref
+        .watch(recurringTransactionsProvider)
+        .where((r) => r.isActive)
+        .length;
 
     if (profile == null) {
       return const Scaffold(body: SkeletonScreen());
@@ -126,6 +132,19 @@ class ProfileScreen extends ConsumerWidget {
                         onTap: () => Navigator.of(context).push(
                           MaterialPageRoute<void>(
                             builder: (_) => const CategoryManagementScreen(),
+                          ),
+                        ),
+                      ),
+                      const _TileDivider(),
+                      _SettingsTile(
+                        icon: Icons.autorenew_rounded,
+                        title: 'Recurring transactions',
+                        subtitle: recurringCount == 0
+                            ? 'None set up'
+                            : '$recurringCount active',
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const RecurringTransactionsScreen(),
                           ),
                         ),
                       ),

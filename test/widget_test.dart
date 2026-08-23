@@ -10,6 +10,7 @@ import 'package:hive/hive.dart';
 import 'package:broke_no_more/models/badge.dart';
 import 'package:broke_no_more/models/category_record.dart';
 import 'package:broke_no_more/models/quest.dart';
+import 'package:broke_no_more/models/recurring_transaction.dart';
 import 'package:broke_no_more/models/transaction.dart';
 import 'package:broke_no_more/models/user_profile.dart';
 
@@ -28,11 +29,14 @@ void main() {
       Hive.registerAdapter(QuestAdapter());
       Hive.registerAdapter(BadgeAdapter());
       Hive.registerAdapter(CategoryRecordAdapter());
+      Hive.registerAdapter(RecurrenceFrequencyAdapter());
+      Hive.registerAdapter(RecurringTransactionAdapter());
     }
     await Hive.openBox<Transaction>(HiveBoxes.transactions);
     await Hive.openBox<UserProfile>(HiveBoxes.profile);
     await Hive.openBox<Quest>(HiveBoxes.quests);
     await Hive.openBox<Badge>(HiveBoxes.badges);
+    await Hive.openBox<RecurringTransaction>(HiveBoxes.recurringTransactions);
     await Hive.openBox<dynamic>(HiveBoxes.appState);
     final categoryBox =
         await Hive.openBox<CategoryRecord>(HiveBoxes.categories);

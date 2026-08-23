@@ -8,10 +8,12 @@ import 'package:broke_no_more/features/log_transaction/log_transaction_sheet.dar
 import 'package:broke_no_more/features/onboarding/onboarding_screen.dart';
 import 'package:broke_no_more/features/profile/category_management_screen.dart';
 import 'package:broke_no_more/features/profile/profile_screen.dart';
+import 'package:broke_no_more/features/profile/recurring_transactions_screen.dart';
 import 'package:broke_no_more/features/quests/quests_screen.dart';
 import 'package:broke_no_more/features/transactions/transaction_history_screen.dart';
 import 'package:broke_no_more/models/category_record.dart';
 import 'package:broke_no_more/models/quest.dart';
+import 'package:broke_no_more/models/recurring_transaction.dart';
 import 'package:broke_no_more/models/transaction.dart';
 import 'package:broke_no_more/models/user_profile.dart';
 import 'package:flutter/material.dart' hide Badge;
@@ -47,6 +49,8 @@ void main() {
       Hive.registerAdapter(QuestAdapter());
       Hive.registerAdapter(BadgeAdapter());
       Hive.registerAdapter(CategoryRecordAdapter());
+      Hive.registerAdapter(RecurrenceFrequencyAdapter());
+      Hive.registerAdapter(RecurringTransactionAdapter());
     }
 
     final transactions =
@@ -56,6 +60,7 @@ void main() {
     await Hive.openBox<Badge>(HiveBoxes.badges);
     final categories =
         await Hive.openBox<CategoryRecord>(HiveBoxes.categories);
+    await Hive.openBox<RecurringTransaction>(HiveBoxes.recurringTransactions);
     await Hive.openBox<dynamic>(HiveBoxes.appState);
 
     // A realistic category set — a short list would hide grid overflow.
@@ -178,6 +183,7 @@ void main() {
     'History': () => const TransactionHistoryScreen(),
     'Onboarding': () => const OnboardingScreen(),
     'Categories': () => const CategoryManagementScreen(),
+    'Recurring': () => const RecurringTransactionsScreen(),
     'Log sheet': () => const Scaffold(body: LogTransactionSheet()),
   };
 

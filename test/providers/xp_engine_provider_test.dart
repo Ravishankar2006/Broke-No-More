@@ -7,6 +7,7 @@ import 'package:broke_no_more/data/profile_repository.dart';
 import 'package:broke_no_more/models/badge.dart';
 import 'package:broke_no_more/models/category_record.dart';
 import 'package:broke_no_more/models/quest.dart';
+import 'package:broke_no_more/models/recurring_transaction.dart';
 import 'package:broke_no_more/models/transaction.dart';
 import 'package:broke_no_more/models/user_profile.dart';
 import 'package:broke_no_more/providers/profile_provider.dart';
@@ -39,6 +40,8 @@ void main() {
       Hive.registerAdapter(QuestAdapter());
       Hive.registerAdapter(BadgeAdapter());
       Hive.registerAdapter(CategoryRecordAdapter());
+      Hive.registerAdapter(RecurrenceFrequencyAdapter());
+      Hive.registerAdapter(RecurringTransactionAdapter());
     }
     await Hive.openBox<Transaction>(HiveBoxes.transactions);
     await Hive.openBox<UserProfile>(HiveBoxes.profile);
@@ -46,6 +49,7 @@ void main() {
     await Hive.openBox<Badge>(HiveBoxes.badges);
     await Hive.openBox<dynamic>(HiveBoxes.appState);
     await Hive.openBox<CategoryRecord>(HiveBoxes.categories);
+    await Hive.openBox<RecurringTransaction>(HiveBoxes.recurringTransactions);
 
     container = ProviderContainer();
     await container
