@@ -35,11 +35,22 @@ class XpBar extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Level ${progress.level}',
-                  style: theme.textTheme.labelLarge),
-              Text(
-                '${progress.xpIntoLevel} / ${progress.xpForNextLevel} XP',
-                style: theme.textTheme.bodySmall,
+              Flexible(
+                child: Text(
+                  'Level ${progress.level}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelLarge,
+                ),
+              ),
+              SizedBox(width: Spacing.sm),
+              Flexible(
+                child: Text(
+                  '${progress.xpIntoLevel} / ${progress.xpForNextLevel} XP',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall,
+                ),
               ),
             ],
           ),
@@ -61,24 +72,40 @@ class XpBar extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text('Level ${progress.level}',
-                      style: theme.textTheme.titleMedium),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.baseline,
-                    textBaseline: TextBaseline.alphabetic,
-                    children: [
-                      CountUpText(
-                        value: progress.xpIntoLevel,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          color: semantics.goldInk,
-                          fontWeight: FontWeight.w700,
+                  // Both halves shrink: at large text scales the level label
+                  // and the XP fraction together exceed the card width.
+                  Flexible(
+                    child: Text(
+                      'Level ${progress.level}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleMedium,
+                    ),
+                  ),
+                  SizedBox(width: Spacing.sm),
+                  Flexible(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        CountUpText(
+                          value: progress.xpIntoLevel,
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            color: semantics.goldInk,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                      ),
-                      Text(
-                        ' / ${progress.xpForNextLevel} XP',
-                        style: theme.textTheme.bodySmall,
-                      ),
-                    ],
+                        Flexible(
+                          child: Text(
+                            ' / ${progress.xpForNextLevel} XP',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),

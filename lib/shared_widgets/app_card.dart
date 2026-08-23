@@ -75,13 +75,21 @@ class AppCard extends StatelessWidget {
       ),
       child: ClipRRect(
         borderRadius: radius,
-        child: onTap == null
-            ? content
-            : _PressScale(
-                onTap: onTap!,
-                borderRadius: radius,
-                child: content,
-              ),
+        // A Material *inside* the decoration, so descendants that paint ink on
+        // their nearest Material ancestor (ListTile, SwitchListTile) don't have
+        // this card's coloured DecoratedBox between them and it — Flutter
+        // asserts on exactly that, since the ink would be painted underneath
+        // the background and never seen.
+        child: Material(
+          type: MaterialType.transparency,
+          child: onTap == null
+              ? content
+              : _PressScale(
+                  onTap: onTap!,
+                  borderRadius: radius,
+                  child: content,
+                ),
+        ),
       ),
     );
   }

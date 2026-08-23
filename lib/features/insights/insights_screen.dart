@@ -268,28 +268,49 @@ class _SummaryHero extends StatelessWidget {
           SizedBox(height: Spacing.md),
           Row(
             children: [
-              if (hasComparison) ...[
-                Icon(
-                  spentMore ? Icons.trending_up : Icons.trending_down,
-                  size: 18,
-                  // Spending less is the good outcome here, so down is green.
-                  color: spentMore ? semantics.expenseInk : semantics.incomeInk,
-                ),
-                SizedBox(width: Spacing.xs),
-                Text(
-                  '${delta.abs().toStringAsFixed(0)}% ${spentMore ? 'more' : 'less'} than last period',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color:
-                        spentMore ? semantics.expenseInk : semantics.incomeInk,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ] else
-                Text(
-                  'No previous period to compare',
-                  style: theme.textTheme.bodySmall,
-                ),
-              const Spacer(),
+              // Flexible, not fixed: this sentence is long and the row also
+              // carries the per-day figure, so on a narrow screen it has to be
+              // allowed to shrink rather than overflow.
+              Expanded(
+                child: hasComparison
+                    ? Row(
+                        children: [
+                          Icon(
+                            spentMore
+                                ? Icons.trending_up
+                                : Icons.trending_down,
+                            size: 18,
+                            // Spending less is the good outcome, so down is
+                            // green.
+                            color: spentMore
+                                ? semantics.expenseInk
+                                : semantics.incomeInk,
+                          ),
+                          SizedBox(width: Spacing.xs),
+                          Expanded(
+                            child: Text(
+                              '${delta.abs().toStringAsFixed(0)}% '
+                              '${spentMore ? 'more' : 'less'} than last period',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: spentMore
+                                    ? semantics.expenseInk
+                                    : semantics.incomeInk,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                    : Text(
+                        'No previous period to compare',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall,
+                      ),
+              ),
+              SizedBox(width: Spacing.sm),
               Text(
                 '${formatCurrency(perDay)}/day',
                 style: theme.textTheme.bodySmall,

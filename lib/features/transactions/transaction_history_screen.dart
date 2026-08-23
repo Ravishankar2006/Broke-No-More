@@ -83,28 +83,33 @@ class _TransactionHistoryScreenState
                   ),
                 ),
                 SizedBox(height: Spacing.md),
-                Row(
-                  children: [
-                    _FilterChip(
-                      label: 'All',
-                      selected: _typeFilter == null,
-                      onTap: () => setState(() => _typeFilter = null),
-                    ),
-                    SizedBox(width: Spacing.sm),
-                    _FilterChip(
-                      label: 'Expenses',
-                      selected: _typeFilter == TransactionType.expense,
-                      onTap: () => setState(
-                          () => _typeFilter = TransactionType.expense),
-                    ),
-                    SizedBox(width: Spacing.sm),
-                    _FilterChip(
-                      label: 'Income',
-                      selected: _typeFilter == TransactionType.income,
-                      onTap: () =>
-                          setState(() => _typeFilter = TransactionType.income),
-                    ),
-                  ],
+                // Scrolls rather than overflowing: three chips plus spacing
+                // exceed a 320px viewport once text scaling is turned up.
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _FilterChip(
+                        label: 'All',
+                        selected: _typeFilter == null,
+                        onTap: () => setState(() => _typeFilter = null),
+                      ),
+                      SizedBox(width: Spacing.sm),
+                      _FilterChip(
+                        label: 'Expenses',
+                        selected: _typeFilter == TransactionType.expense,
+                        onTap: () => setState(
+                            () => _typeFilter = TransactionType.expense),
+                      ),
+                      SizedBox(width: Spacing.sm),
+                      _FilterChip(
+                        label: 'Income',
+                        selected: _typeFilter == TransactionType.income,
+                        onTap: () => setState(
+                            () => _typeFilter = TransactionType.income),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
