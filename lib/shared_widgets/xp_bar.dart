@@ -1,42 +1,132 @@
 import 'package:flutter/material.dart';
 
 import '../core/theme/app_dimens.dart';
+import '../core/theme/app_elevation.dart';
 import '../core/theme/app_semantic_colors.dart';
 import '../core/utils/xp_engine.dart';
+import 'animated_progress_bar.dart';
+import 'celebration_effects.dart';
 
+/// Level and XP progress — the app's core reward readout.
+///
+/// Was a label row above a stock [LinearProgressIndicator] that snapped to its
+/// new value, which meant the single most important number in a gamified app
+/// changed without the user seeing it move. Now the level sits in a medallion,
+/// the bar tweens and glows, and the XP count rolls up.
 class XpBar extends StatelessWidget {
-  const XpBar({super.key, required this.progress});
+  const XpBar({super.key, required this.progress, this.compact = false});
 
   final LevelProgress progress;
 
+  /// Drops the medallion and the "to next level" line — for tight contexts
+  /// like a list row or a dense header.
+  final bool compact;
+
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final semantics = context.semantics;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    final remaining = progress.xpForNextLevel - progress.xpIntoLevel;
+
+    if (compact) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Level ${progress.level}',
+                  style: theme.textTheme.labelLarge),
+              Text(
+                '${progress.xpIntoLevel} / ${progress.xpForNextLevel} XP',
+                style: theme.textTheme.bodySmall,
+              ),
+            ],
+          ),
+          SizedBox(height: Spacing.sm),
+          AnimatedProgressBar(value: progress.fraction),
+        ],
+      );
+    }
+
+    return Row(
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text('Level ${progress.level}',
-                style: Theme.of(context).textTheme.titleMedium),
-            Text(
-              '${progress.xpIntoLevel} / ${progress.xpForNextLevel} XP',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
-        ),
-        SizedBox(height: Spacing.sm),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-          child: LinearProgressIndicator(
-            value: progress.fraction.clamp(0, 1),
-            minHeight: 10,
-            backgroundColor: semantics.xpTrack,
-            valueColor: AlwaysStoppedAnimation<Color>(semantics.xp),
+        _LevelMedallion(level: progress.level),
+        SizedBox(width: Spacing.lg),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text('Level ${progress.level}',
+                      style: theme.textTheme.titleMedium),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      CountUpText(
+                        value: progress.xpIntoLevel,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          color: semantics.goldInk,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        ' / ${progress.xpForNextLevel} XP',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              SizedBox(height: Spacing.sm),
+              AnimatedProgressBar(value: progress.fraction),
+              SizedBox(height: Spacing.sm),
+              Text(
+                remaining > 0
+                    ? '$remaining XP to level ${progress.level + 1}'
+                    : 'Level complete!',
+                style: theme.textTheme.bodySmall,
+              ),
+            ],
           ),
         ),
       ],
+    );
+  }
+}
+
+/// The level number in a gold gradient disc — gives the XP block an anchor so
+/// it reads as an achievement rather than a form field.
+class _LevelMedallion extends StatelessWidget {
+  const _LevelMedallion({required this.level});
+
+  final int level;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final semantics = context.semantics;
+
+    return Container(
+      width: 52,
+      height: 52,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: AppGradients.xp(theme.brightness),
+        boxShadow: AppShadows.gold(theme.brightness),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        '$level',
+        style: theme.textTheme.titleLarge?.copyWith(
+          color: semantics.onGold,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
     );
   }
 }
