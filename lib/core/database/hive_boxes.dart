@@ -13,6 +13,10 @@ abstract class HiveBoxes {
   static const String quests = 'quests';
   static const String badges = 'badges';
   static const String categories = 'categories';
+
+  /// Untyped key/value box for small bits of app state that don't warrant a
+  /// model — currently the set of quest titles the user has skipped.
+  static const String appState = 'app_state';
 }
 
 /// Registers all Hive adapters and opens every box used by the app.
@@ -35,6 +39,7 @@ Future<void> initHive() async {
     Hive.openBox<Quest>(HiveBoxes.quests),
     Hive.openBox<Badge>(HiveBoxes.badges),
     Hive.openBox<CategoryRecord>(HiveBoxes.categories),
+    Hive.openBox<dynamic>(HiveBoxes.appState),
   ]);
 
   await _seedDefaultCategoriesIfEmpty();

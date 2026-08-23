@@ -9,6 +9,13 @@ class ThemeModeNotifier extends Notifier<ThemeMode> {
   void toggle() {
     state = state == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
   }
+
+  /// Explicit set, for a switch whose position must match the resulting state.
+  /// `toggle` flips relative to the current value, which desyncs a Switch when
+  /// the mode is still `system`.
+  void setDark(bool dark) {
+    state = dark ? ThemeMode.dark : ThemeMode.light;
+  }
 }
 
 final themeModeProvider =

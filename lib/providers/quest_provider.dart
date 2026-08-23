@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/quest_repository.dart';
+import '../data/skipped_quest_repository.dart';
 import '../models/quest.dart';
 import 'profile_provider.dart';
 import 'transaction_provider.dart';
@@ -45,4 +46,38 @@ final questCandidatesProvider = Provider<List<QuestCandidate>>((ref) {
   return ref
       .watch(questRepositoryProvider)
       .generateCandidates(transactions, currentStreak: currentStreak);
+});
+
+final skippedQuestRepositoryProvider = Provider<SkippedQuestRepository>((ref) {
+  return SkippedQuestRepository();
+});
+
+/// Titles the user has dismissed. Persisted, so a skip survives a restart.
+class SkippedQuestsNotifier extends Notifier<Set<String>> {
+  @override
+  Set<String> build() => ref.watch(skippedQuestRepositoryProvider).titles;
+
+  Future<void> skip(String title) async {
+    await ref.read(skippedQuestRepositoryProvider).skip(title);
+    state = ref.read(skippedQuestRepositoryProvider).titles;
+  }
+
+  Future<void> unskip(String title) async {
+    await ref.read(skippedQuestRepositoryProvider).unskip(title);
+    state = ref.read(skippedQuestRepositoryProvider).titles;
+  }
+}
+
+final skippedQuestsProvider =
+    NotifierProvider<SkippedQuestsNotifier, Set<String>>(
+  SkippedQuestsNotifier.new,
+);
+
+/// Candidates with the user's dismissals already filtered out.
+final visibleQuestCandidatesProvider = Provider<List<QuestCandidate>>((ref) {
+  final skipped = ref.watch(skippedQuestsProvider);
+  return ref
+      .watch(questCandidatesProvider)
+      .where((c) => !skipped.contains(c.title))
+      .toList(growable: false);
 });

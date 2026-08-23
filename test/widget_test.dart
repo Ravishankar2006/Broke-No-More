@@ -33,6 +33,7 @@ void main() {
     await Hive.openBox<UserProfile>(HiveBoxes.profile);
     await Hive.openBox<Quest>(HiveBoxes.quests);
     await Hive.openBox<Badge>(HiveBoxes.badges);
+    await Hive.openBox<dynamic>(HiveBoxes.appState);
     final categoryBox =
         await Hive.openBox<CategoryRecord>(HiveBoxes.categories);
     await categoryBox.add(CategoryRecord(
@@ -61,7 +62,9 @@ void main() {
     await tester.pumpWidget(const ProviderScope(child: BrokeNoMoreApp()));
     await tester.pumpAndSettle();
 
-    expect(find.text('Welcome to Broke No More'), findsOneWidget);
+    // Onboarding opens on the welcome page of a three-step PageView.
+    expect(find.text('Broke No More'), findsOneWidget);
+    expect(find.text('Continue'), findsOneWidget);
   });
 
   testWidgets(
@@ -70,6 +73,11 @@ void main() {
       await tester.pumpWidget(const ProviderScope(child: BrokeNoMoreApp()));
       await tester.pumpAndSettle();
 
+      // Page 1 of 3 — welcome.
+      await tester.tap(find.text('Continue'));
+      await tester.pumpAndSettle();
+
+      // Page 2 — name and avatar.
       await tester.enterText(find.byType(TextField).first, 'Riya');
       await tester.pump();
       // Drop focus so the cursor stops blinking — a focused TextField
@@ -77,15 +85,18 @@ void main() {
       FocusManager.instance.primaryFocus?.unfocus();
       await tester.pump();
 
-      await tester.ensureVisible(find.text('Get started'));
-      await tester.pump();
+      await tester.tap(find.text('Continue'));
+      await tester.pumpAndSettle();
+
+      // Page 3 — budget, then submit.
+      expect(find.text('Start'), findsOneWidget);
 
       // Profile creation goes through Hive, which does real dart:io file
       // writes. Those never resolve on flutter_test's fake clock unless the
       // awaiting call happens inside runAsync — otherwise the tap's
       // onPressed future just hangs forever and so does tearDown after it.
       await tester.runAsync(() async {
-        await tester.tap(find.text('Get started'));
+        await tester.tap(find.text('Start'));
         await Future<void>.delayed(const Duration(milliseconds: 300));
       });
       await tester.pump();
@@ -94,9 +105,9 @@ void main() {
       // left pending when the test ends.
       await tester.pump(const Duration(milliseconds: 600));
 
-      // The home header now shows a time-of-day greeting above the name
-      // rather than a single "Hey, {name}" string. Assert on the name, which
-      // is the part that doesn't depend on when the suite runs.
+      // The home header shows a time-of-day greeting above the name rather
+      // than a single "Hey, {name}" string. Assert on the name, which is the
+      // part that doesn't depend on when the suite runs.
       expect(find.text('Riya'), findsOneWidget);
     },
     timeout: const Timeout(Duration(seconds: 30)),

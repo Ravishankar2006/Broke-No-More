@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_dimens.dart';
+import '../../core/theme/app_motion.dart';
 import '../../core/utils/category_icons.dart';
 import '../../models/category_record.dart';
 import '../../models/transaction.dart';
@@ -40,9 +41,46 @@ class _CategoryManagementScreenState
     _refresh();
   }
 
+  /// Confirms first, then offers an undo.
+  ///
+  /// Deletion used to be immediate with no confirmation and no way back, from
+  /// an icon button sitting right next to the drag affordance — an easy
+  /// mis-tap with a permanent result.
   Future<void> _delete(CategoryRecord record) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Delete "${record.name}"?'),
+        content: const Text(
+          'Transactions already logged under this category keep their name — '
+          'only future logs are affected.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.onError,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    // Capture before removal so undo can rebuild it.
+    final name = record.name;
+    final iconId = record.iconId;
+    final type = record.type;
+
     final removed = await ref.read(categoryRepositoryProvider).remove(record);
-    if (!removed && mounted) {
+    if (!mounted) return;
+    if (!removed) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text("Can't remove the last category of a type."),
@@ -51,6 +89,21 @@ class _CategoryManagementScreenState
       return;
     }
     _refresh();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Deleted "$name"'),
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () async {
+            await ref
+                .read(categoryRepositoryProvider)
+                .add(name: name, iconId: iconId, type: type);
+            _refresh();
+          },
+        ),
+      ),
+    );
   }
 
   Future<void> _reorder(List<CategoryRecord> current, int oldIndex, int newIndex) async {
@@ -91,7 +144,12 @@ class _CategoryManagementScreenState
           ),
           Expanded(
             child: ReorderableListView.builder(
-              padding: EdgeInsets.symmetric(vertical: Spacing.sm),
+              // Bottom room for the extended FAB, which used to sit on top of
+              // the last row.
+              padding: EdgeInsets.only(
+                top: Spacing.sm,
+                bottom: Spacing.xxxl * 2,
+              ),
               itemCount: categories.length,
               onReorderItem: (oldIndex, newIndex) =>
                   _reorder(categories, oldIndex, newIndex),
@@ -107,9 +165,18 @@ class _CategoryManagementScreenState
                     children: [
                       IconButton(
                         icon: const Icon(Icons.delete_outline),
+                        tooltip: 'Delete',
                         onPressed: () => _delete(category),
                       ),
-                      const Icon(Icons.drag_handle),
+                      // A real drag listener. This was a decorative Icon, so
+                      // the one thing that looked like a handle wasn't one.
+                      ReorderableDragStartListener(
+                        index: index,
+                        child: Padding(
+                          padding: EdgeInsets.all(Spacing.sm),
+                          child: const Icon(Icons.drag_handle),
+                        ),
+                      ),
                     ],
                   ),
                 );
@@ -164,28 +231,47 @@ class _CategoryEditorDialogState extends State<_CategoryEditorDialog> {
             SizedBox(height: Spacing.lg),
             Text('Icon', style: Theme.of(context).textTheme.titleSmall),
             SizedBox(height: Spacing.sm),
-            Wrap(
-              spacing: Spacing.sm,
-              runSpacing: Spacing.sm,
-              children: kCategoryIconChoices.entries.map((entry) {
-                final selected = entry.key == _iconId;
-                return InkWell(
-                  onTap: () => setState(() => _iconId = entry.key),
-                  borderRadius: BorderRadius.circular(AppRadius.pill),
-                  child: CircleAvatar(
-                    radius: 20,
-                    backgroundColor: selected
-                        ? Theme.of(context).colorScheme.primary
-                        : Theme.of(context).colorScheme.surfaceContainerHighest,
-                    child: Icon(
-                      entry.value,
-                      color: selected
-                          ? Theme.of(context).colorScheme.onPrimary
-                          : Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                );
-              }).toList(),
+            // A scrollable grid of rounded cells with an animated selection,
+            // replacing a Wrap of raw CircleAvatars that had no selection
+            // affordance beyond a flat colour swap.
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 200),
+              child: SingleChildScrollView(
+                child: Wrap(
+                  spacing: Spacing.sm,
+                  runSpacing: Spacing.sm,
+                  children: kCategoryIconChoices.entries.map((entry) {
+                    final selected = entry.key == _iconId;
+                    final cs = Theme.of(context).colorScheme;
+                    return GestureDetector(
+                      onTap: () => setState(() => _iconId = entry.key),
+                      behavior: HitTestBehavior.opaque,
+                      child: AnimatedContainer(
+                        duration: AppMotion.quick,
+                        curve: AppMotion.standardCurve,
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: selected
+                              ? cs.primary
+                              : cs.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(AppRadius.md),
+                          border: selected
+                              ? Border.all(color: cs.primary, width: 2)
+                              : null,
+                        ),
+                        child: Icon(
+                          entry.value,
+                          size: 22,
+                          color: selected
+                              ? cs.onPrimary
+                              : cs.onSurfaceVariant,
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
             ),
           ],
         ),
