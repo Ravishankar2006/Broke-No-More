@@ -1,5 +1,9 @@
+import 'dart:convert';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../../core/notifications/streak_reminder_service.dart';
 import '../../core/theme/app_dimens.dart';
@@ -16,8 +20,10 @@ import '../../providers/badge_provider.dart';
 import '../../providers/profile_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/transaction_provider.dart';
+import '../../providers/xp_engine_provider.dart';
 import '../../shared_widgets/app_avatar.dart';
 import '../../shared_widgets/app_card.dart';
+import '../../shared_widgets/celebration_sequence.dart';
 import '../../shared_widgets/section_header.dart';
 import '../../shared_widgets/skeleton.dart';
 import '../../shared_widgets/stat_tile.dart';
@@ -156,11 +162,22 @@ class ProfileScreen extends ConsumerWidget {
                 SectionHeader(title: 'Data'),
                 AppCard(
                   padding: EdgeInsets.symmetric(vertical: Spacing.xs),
-                  child: _SettingsTile(
-                    icon: Icons.download_outlined,
-                    title: 'Export as CSV',
-                    subtitle: 'Doubles as a local backup',
-                    onTap: () => _exportCsv(context, ref),
+                  child: Column(
+                    children: [
+                      _SettingsTile(
+                        icon: Icons.ios_share_outlined,
+                        title: 'Export as CSV',
+                        subtitle: 'Share a backup of every transaction',
+                        onTap: () => _exportCsv(context, ref),
+                      ),
+                      const _TileDivider(),
+                      _SettingsTile(
+                        icon: Icons.upload_file_outlined,
+                        title: 'Import from CSV',
+                        subtitle: 'Restore or merge from a backup file',
+                        onTap: () => _importCsv(context, ref),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -234,34 +251,245 @@ class ProfileScreen extends ConsumerWidget {
 
   Future<void> _exportCsv(BuildContext context, WidgetRef ref) async {
     final transactions = ref.read(transactionsProvider);
-    final path = await exportTransactionsToFile(transactions);
+    try {
+      // Hands the file to the OS share sheet — writing it to app-private
+      // documents storage alone (the old behaviour) left the user with a
+      // path they could never actually open on Android.
+      await shareTransactionsCsv(transactions);
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Couldn't export — please try again.")),
+      );
+    }
+  }
+
+  Future<void> _importCsv(BuildContext context, WidgetRef ref) async {
+    final PlatformFile? file;
+    try {
+      file = await FilePicker.pickFile(
+        type: FileType.custom,
+        allowedExtensions: ['csv'],
+      );
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Couldn't open the file picker.")),
+      );
+      return;
+    }
+    if (file == null || !context.mounted) return; // user cancelled
+
+    final String content;
+    try {
+      content = utf8.decode(await file.readAsBytes());
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Couldn't read that file.")),
+      );
+      return;
+    }
+
+    final parsed = parseTransactionsCsv(content);
+    if (parsed.transactions.isEmpty) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            parsed.errors.isEmpty
+                ? 'No transactions found in that file.'
+                : "Couldn't read any rows: ${parsed.errors.first}",
+          ),
+        ),
+      );
+      return;
+    }
+
+    // Split into rows that write cleanly and rows whose id already exists on
+    // this device with *different* content — an identical row (the common
+    // case of re-importing the same backup) is safe to overwrite silently
+    // and isn't worth asking about.
+    final existingById = {
+      for (final t in ref.read(transactionsProvider)) t.id: t,
+    };
+    final toWrite = <Transaction>[];
+    final conflicts = <_ImportConflict>[];
+    for (final t in parsed.transactions) {
+      final existing = existingById[t.id];
+      if (existing == null || _sameContent(existing, t)) {
+        toWrite.add(t);
+      } else {
+        conflicts.add(_ImportConflict(existing: existing, imported: t));
+      }
+    }
+
+    if (conflicts.isNotEmpty) {
+      if (!context.mounted) return;
+      final resolved = await showDialog<List<Transaction>>(
+        context: context,
+        builder: (context) => _ImportConflictDialog(conflicts: conflicts),
+      );
+      if (resolved == null) return; // user cancelled the whole import
+      toWrite.addAll(resolved);
+    }
+
+    if (toWrite.isEmpty) return; // every conflict was resolved as "keep existing"
     if (!context.mounted) return;
 
-    // A raw filesystem path in a SnackBar was the whole previous feedback.
-    await showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        icon: const Icon(Icons.check_circle_outline),
-        title: const Text('Export complete'),
-        content: Column(
+    try {
+      final result =
+          await ref.read(xpEngineOrchestratorProvider).importTransactions(toWrite);
+      if (!context.mounted) return;
+
+      final skipped = parsed.errors.length;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            skipped == 0
+                ? 'Imported ${result.importedCount} transaction(s).'
+                : 'Imported ${result.importedCount} transaction(s), '
+                    'skipped $skipped row(s) with errors.',
+          ),
+        ),
+      );
+
+      await showGamificationCelebrations(
+        context,
+        xpGained: result.xpGained,
+        completedQuests: result.completedQuests,
+        leveledUpTo: result.leveledUpTo,
+        newlyUnlockedBadges: result.newlyUnlockedBadges,
+        totalBadgesUnlocked: ref.read(badgesProvider).length,
+      );
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Couldn't import — please try again.")),
+      );
+    }
+  }
+}
+
+/// Whether [a] and [b] represent the same transaction content — used to tell
+/// a genuine edit conflict apart from re-importing an unchanged row.
+bool _sameContent(Transaction a, Transaction b) {
+  return a.amount == b.amount &&
+      a.type == b.type &&
+      a.category == b.category &&
+      a.note == b.note &&
+      a.timestamp.isAtSameMomentAs(b.timestamp);
+}
+
+class _ImportConflict {
+  const _ImportConflict({required this.existing, required this.imported});
+
+  final Transaction existing;
+  final Transaction imported;
+}
+
+/// Lets the user resolve, per row, an imported transaction whose id already
+/// exists on the device with different content. Defaults every row to
+/// "keep existing" — the non-destructive choice for a conflict the user
+/// hasn't looked at yet.
+class _ImportConflictDialog extends StatefulWidget {
+  const _ImportConflictDialog({required this.conflicts});
+
+  final List<_ImportConflict> conflicts;
+
+  @override
+  State<_ImportConflictDialog> createState() => _ImportConflictDialogState();
+}
+
+class _ImportConflictDialogState extends State<_ImportConflictDialog> {
+  late final List<bool> _useImported =
+      List<bool>.filled(widget.conflicts.length, false);
+  final _dateFormat = DateFormat('MMM d, y');
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return AlertDialog(
+      title: Text('${widget.conflicts.length} conflicting transaction(s)'),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('${transactions.length} transactions saved to:'),
-            SizedBox(height: Spacing.sm),
-            SelectableText(
-              path,
-              style: Theme.of(context).textTheme.bodySmall,
+            Text(
+              'These rows already exist on this device with different '
+              'details. Choose which version to keep for each.',
+              style: theme.textTheme.bodySmall,
+            ),
+            SizedBox(height: Spacing.md),
+            Flexible(
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: widget.conflicts.length,
+                separatorBuilder: (context, index) =>
+                    SizedBox(height: Spacing.lg),
+                itemBuilder: (context, i) {
+                  final conflict = widget.conflicts[i];
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        conflict.existing.category,
+                        style: theme.textTheme.titleSmall,
+                      ),
+                      SizedBox(height: Spacing.xxs),
+                      Text(
+                        'On device: ${formatCurrency(conflict.existing.amount)}'
+                        ' · ${_dateFormat.format(conflict.existing.timestamp)}',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                      Text(
+                        'Imported: ${formatCurrency(conflict.imported.amount)}'
+                        ' · ${_dateFormat.format(conflict.imported.timestamp)}',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                      SizedBox(height: Spacing.xs),
+                      SegmentedButton<bool>(
+                        segments: const [
+                          ButtonSegment(
+                            value: false,
+                            label: Text('Keep existing'),
+                          ),
+                          ButtonSegment(
+                            value: true,
+                            label: Text('Use imported'),
+                          ),
+                        ],
+                        selected: {_useImported[i]},
+                        onSelectionChanged: (selection) =>
+                            setState(() => _useImported[i] = selection.first),
+                      ),
+                    ],
+                  );
+                },
+              ),
             ),
           ],
         ),
-        actions: [
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Done'),
-          ),
-        ],
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel import'),
+        ),
+        FilledButton(
+          onPressed: () {
+            final resolved = [
+              for (var i = 0; i < widget.conflicts.length; i++)
+                if (_useImported[i]) widget.conflicts[i].imported,
+            ];
+            Navigator.of(context).pop(resolved);
+          },
+          child: const Text('Import'),
+        ),
+      ],
     );
   }
 }

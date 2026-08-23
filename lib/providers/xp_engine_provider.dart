@@ -46,6 +46,40 @@ class LogTransactionResult {
   final List<Quest> completedQuests;
 }
 
+/// Result of a bulk [XpEngineOrchestrator.importTransactions] call — the
+/// same downstream fields as [LogTransactionResult], but for a batch of rows
+/// rather than one.
+class ImportResult {
+  const ImportResult({
+    required this.importedCount,
+    required this.xpGained,
+    required this.newlyUnlockedBadges,
+    required this.leveledUpTo,
+    required this.completedQuests,
+  });
+
+  final int importedCount;
+  final int xpGained;
+  final List<BadgeDefinition> newlyUnlockedBadges;
+  final int? leveledUpTo;
+  final List<Quest> completedQuests;
+}
+
+/// What [XpEngineOrchestrator._recomputeAndPersist] produces — the shared
+/// tail both a single mutation and a bulk import build their own public
+/// result type from.
+class _RecomputeOutcome {
+  const _RecomputeOutcome({
+    required this.totals,
+    required this.newlyUnlockedBadges,
+    required this.completedQuests,
+  });
+
+  final GamificationTotals totals;
+  final List<BadgeDefinition> newlyUnlockedBadges;
+  final List<Quest> completedQuests;
+}
+
 /// Orchestrates every mutation to the transaction log.
 ///
 /// All three entry points — [logTransaction], [updateTransaction],
@@ -120,12 +154,52 @@ class XpEngineOrchestrator {
     });
   }
 
-  /// Recomputes and persists everything downstream of the transaction list,
-  /// after [change] has mutated the box.
+  /// Writes a batch of externally-sourced transactions (CSV import) and
+  /// recomputes everything downstream, same as a single log — the only
+  /// difference is [TransactionRepository.putAll] replaces the single-row
+  /// `change` closure [_mutate] takes.
   ///
-  /// Step order is load-bearing: badges depend on the replayed level *and* the
-  /// replayed quest-completion count, so quests must settle before badges are
-  /// evaluated.
+  /// [transactions] must already be conflict-resolved by the caller: any id
+  /// also present on the device is overwritten outright. Nothing here decides
+  /// what counts as a conflict.
+  Future<ImportResult> importTransactions(List<Transaction> transactions) async {
+    if (_busy) {
+      throw StateError('A transaction mutation is already in progress');
+    }
+    _busy = true;
+    try {
+      final now = DateTime.now();
+      final transactionRepo = _ref.read(transactionRepositoryProvider);
+
+      final before = _ref.read(profileProvider);
+      if (before == null) {
+        throw StateError('import attempted before a profile exists');
+      }
+      final beforeQuestIds = _completedQuestIds();
+
+      await transactionRepo.putAll(transactions);
+      _ref.read(transactionsProvider.notifier).refresh();
+
+      final outcome = await _recomputeAndPersist(
+        now: now,
+        before: before,
+        beforeQuestIds: beforeQuestIds,
+      );
+
+      return ImportResult(
+        importedCount: transactions.length,
+        xpGained: outcome.totals.totalXp - before.currentXP,
+        newlyUnlockedBadges: outcome.newlyUnlockedBadges,
+        leveledUpTo: outcome.totals.level > before.level ? outcome.totals.level : null,
+        completedQuests: outcome.completedQuests,
+      );
+    } finally {
+      _busy = false;
+    }
+  }
+
+  /// Runs [change] against the box, then recomputes and persists everything
+  /// downstream of the transaction list.
   Future<LogTransactionResult> _mutate(
     Future<Transaction?> Function(TransactionRepository repo) change,
   ) async {
@@ -136,7 +210,6 @@ class XpEngineOrchestrator {
     try {
       final now = DateTime.now();
       final transactionRepo = _ref.read(transactionRepositoryProvider);
-      final profileRepo = _ref.read(profileRepositoryProvider);
 
       final before = _ref.read(profileProvider);
       if (before == null) {
@@ -144,82 +217,109 @@ class XpEngineOrchestrator {
       }
       final beforeQuestIds = _completedQuestIds();
 
-      // 1. Mutate the box.
       final touched = await change(transactionRepo);
       _ref.read(transactionsProvider.notifier).refresh();
 
-      // 2. Replay gamification from the full list.
-      final all = _ref.read(transactionsProvider);
-      final replay = replayGamification(
-        ReplayInput(
-          transactions: all,
-          joinDate: before.joinDate,
-          monthlyBudget: before.monthlyBudget,
-          asOf: now,
-        ),
-      );
-      await transactionRepo.writeBackXp(replay.xpByTransactionId);
-
-      // 3. Replay quests (before badges — badges count completions).
-      await _replayQuests(
-        transactions: all,
-        currentStreak: replay.currentStreak,
-        asOf: now,
-      );
-
-      // 3b. Fold quest-completion XP into the transaction-derived total —
-      // must happen after quests have settled, so a quest that just
-      // completed this mutation is already counted.
-      final totals = combineXpWithQuests(
-        transactionXp: replay.totalXp,
-        quests: _ref.read(questsProvider),
-      );
-
-      // 4. Unlock any newly-eligible badges. Additive only.
-      final newlyUnlockedBadges = await _unlockEligibleBadges(
-        transactionCount: all.length,
-        currentStreak: replay.currentStreak,
-        level: totals.level,
-        daysUnderBudget: replay.daysUnderBudgetCount,
+      final outcome = await _recomputeAndPersist(
         now: now,
+        before: before,
+        beforeQuestIds: beforeQuestIds,
       );
-
-      // 5. Persist the profile, ratcheting anything that must never regress.
-      final updated = before.copyWith(
-        currentXP: totals.totalXp,
-        level: totals.level,
-        currentStreak: replay.currentStreak,
-        longestStreak: math.max(before.longestStreak, replay.longestStreakSeen),
-        lastLoggedDate: replay.lastLoggedDay ?? before.joinDate,
-        streakFreezesLeft: replay.streakFreezesLeft,
-        lastFreezeResetDate: replay.lastFreezeResetDate,
-        lastBudgetBonusDate: replay.lastBudgetBonusDate,
-        daysUnderBudgetCount: replay.daysUnderBudgetCount,
-        badgeIds: newlyUnlockedBadges.isEmpty
-            ? before.badgeIds
-            : [...before.badgeIds, ...newlyUnlockedBadges.map((b) => b.id)],
-      );
-      await profileRepo.save(updated);
-      _ref.read(profileProvider.notifier).setProfile(updated);
-
-      await _syncReminder(updated, replay.lastLoggedDay, now);
-
-      final completedQuests = _ref
-          .read(questsProvider)
-          .where((q) =>
-              q.status == QuestStatus.completed && !beforeQuestIds.contains(q.id))
-          .toList(growable: false);
 
       return LogTransactionResult(
         transaction: touched,
-        xpGained: totals.totalXp - before.currentXP,
-        newlyUnlockedBadges: newlyUnlockedBadges,
-        leveledUpTo: totals.level > before.level ? totals.level : null,
-        completedQuests: completedQuests,
+        xpGained: outcome.totals.totalXp - before.currentXP,
+        newlyUnlockedBadges: outcome.newlyUnlockedBadges,
+        leveledUpTo: outcome.totals.level > before.level ? outcome.totals.level : null,
+        completedQuests: outcome.completedQuests,
       );
     } finally {
       _busy = false;
     }
+  }
+
+  /// Shared by [_mutate] and [importTransactions]: replays gamification
+  /// state from the (already-mutated) transaction list, advances quests,
+  /// folds in quest XP, unlocks badges, and persists the profile.
+  ///
+  /// Step order is load-bearing: badges depend on the replayed level *and*
+  /// the replayed quest-completion count, so quests must settle before
+  /// badges are evaluated.
+  Future<_RecomputeOutcome> _recomputeAndPersist({
+    required DateTime now,
+    required UserProfile before,
+    required Set<String> beforeQuestIds,
+  }) async {
+    final transactionRepo = _ref.read(transactionRepositoryProvider);
+    final profileRepo = _ref.read(profileRepositoryProvider);
+
+    // 1. Replay gamification from the full list.
+    final all = _ref.read(transactionsProvider);
+    final replay = replayGamification(
+      ReplayInput(
+        transactions: all,
+        joinDate: before.joinDate,
+        monthlyBudget: before.monthlyBudget,
+        asOf: now,
+      ),
+    );
+    await transactionRepo.writeBackXp(replay.xpByTransactionId);
+
+    // 2. Replay quests (before badges — badges count completions).
+    await _replayQuests(
+      transactions: all,
+      currentStreak: replay.currentStreak,
+      asOf: now,
+    );
+
+    // 2b. Fold quest-completion XP into the transaction-derived total —
+    // must happen after quests have settled, so a quest that just
+    // completed this mutation is already counted.
+    final totals = combineXpWithQuests(
+      transactionXp: replay.totalXp,
+      quests: _ref.read(questsProvider),
+    );
+
+    // 3. Unlock any newly-eligible badges. Additive only.
+    final newlyUnlockedBadges = await _unlockEligibleBadges(
+      transactionCount: all.length,
+      currentStreak: replay.currentStreak,
+      level: totals.level,
+      daysUnderBudget: replay.daysUnderBudgetCount,
+      now: now,
+    );
+
+    // 4. Persist the profile, ratcheting anything that must never regress.
+    final updated = before.copyWith(
+      currentXP: totals.totalXp,
+      level: totals.level,
+      currentStreak: replay.currentStreak,
+      longestStreak: math.max(before.longestStreak, replay.longestStreakSeen),
+      lastLoggedDate: replay.lastLoggedDay ?? before.joinDate,
+      streakFreezesLeft: replay.streakFreezesLeft,
+      lastFreezeResetDate: replay.lastFreezeResetDate,
+      lastBudgetBonusDate: replay.lastBudgetBonusDate,
+      daysUnderBudgetCount: replay.daysUnderBudgetCount,
+      badgeIds: newlyUnlockedBadges.isEmpty
+          ? before.badgeIds
+          : [...before.badgeIds, ...newlyUnlockedBadges.map((b) => b.id)],
+    );
+    await profileRepo.save(updated);
+    _ref.read(profileProvider.notifier).setProfile(updated);
+
+    await _syncReminder(updated, replay.lastLoggedDay, now);
+
+    final completedQuests = _ref
+        .read(questsProvider)
+        .where((q) =>
+            q.status == QuestStatus.completed && !beforeQuestIds.contains(q.id))
+        .toList(growable: false);
+
+    return _RecomputeOutcome(
+      totals: totals,
+      newlyUnlockedBadges: newlyUnlockedBadges,
+      completedQuests: completedQuests,
+    );
   }
 
   Set<String> _completedQuestIds() {

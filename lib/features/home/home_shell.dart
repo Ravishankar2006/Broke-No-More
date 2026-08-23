@@ -9,10 +9,7 @@ import '../../core/utils/date_helpers.dart';
 import '../../providers/badge_provider.dart';
 import '../../providers/profile_provider.dart';
 import '../../providers/xp_engine_provider.dart';
-import '../../shared_widgets/badge_unlock_dialog.dart';
-import '../../shared_widgets/celebration_effects.dart';
-import '../../shared_widgets/level_up_dialog.dart';
-import '../../shared_widgets/quest_complete_dialog.dart';
+import '../../shared_widgets/celebration_sequence.dart';
 import '../insights/insights_screen.dart';
 import '../log_transaction/log_transaction_sheet.dart';
 import '../profile/profile_screen.dart';
@@ -67,25 +64,13 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     );
     if (!mounted || result == null) return;
 
-    // Every log now gets acknowledged. Previously a log that didn't happen to
-    // trigger a level-up produced no feedback at all — the sheet just closed.
-    if (result.xpGained > 0) showXpGain(context, result.xpGained);
-
-    // completedQuests was computed by the orchestrator but never surfaced —
-    // a quest could fill its bar to 100% with no acknowledgement at all.
-    if (result.completedQuests.isNotEmpty) {
-      await showQuestCompleteDialog(context, result.completedQuests);
-    }
-
-    if (!mounted) return;
-    if (result.leveledUpTo != null) {
-      await showLevelUpDialog(context, result.leveledUpTo!);
-    }
-    if (!mounted || result.newlyUnlockedBadges.isEmpty) return;
-    await showBadgeUnlockDialog(
+    await showGamificationCelebrations(
       context,
-      result.newlyUnlockedBadges,
-      totalUnlocked: ref.read(badgesProvider).length,
+      xpGained: result.xpGained,
+      completedQuests: result.completedQuests,
+      leveledUpTo: result.leveledUpTo,
+      newlyUnlockedBadges: result.newlyUnlockedBadges,
+      totalBadgesUnlocked: ref.read(badgesProvider).length,
     );
   }
 

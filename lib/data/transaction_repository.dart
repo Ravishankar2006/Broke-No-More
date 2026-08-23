@@ -97,6 +97,14 @@ class TransactionRepository {
 
   Future<void> delete(String id) => _box.delete(id);
 
+  /// Writes every transaction in [transactions] by id, overwriting any
+  /// existing row with the same id. Used by CSV import, which resolves
+  /// conflicts itself before calling this — the repository doesn't decide
+  /// what counts as a conflict.
+  Future<void> putAll(Iterable<Transaction> transactions) {
+    return _box.putAll({for (final t in transactions) t.id: t});
+  }
+
   List<Transaction> forDay(DateTime day) {
     return _box.values.where((t) => isSameDay(t.timestamp, day)).toList();
   }

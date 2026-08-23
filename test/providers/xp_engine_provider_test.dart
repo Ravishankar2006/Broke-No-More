@@ -11,6 +11,7 @@ import 'package:broke_no_more/models/transaction.dart';
 import 'package:broke_no_more/models/user_profile.dart';
 import 'package:broke_no_more/providers/profile_provider.dart';
 import 'package:broke_no_more/providers/quest_provider.dart';
+import 'package:broke_no_more/providers/transaction_provider.dart';
 import 'package:broke_no_more/providers/xp_engine_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -211,4 +212,75 @@ void main() {
       expect(container.read(profileProvider)!.level, greaterThanOrEqualTo(5));
     },
   );
+
+  group('importTransactions', () {
+    Transaction importedTx({
+      required String id,
+      double amount = 40,
+      String category = 'Food',
+      DateTime? timestamp,
+    }) {
+      final ts = timestamp ?? DateTime.now();
+      return Transaction(
+        id: id,
+        amount: amount,
+        type: TransactionType.expense,
+        category: category,
+        timestamp: ts,
+        loggedAt: ts,
+        isQuickLog: false,
+      );
+    }
+
+    test('writes new rows and recomputes XP the same as a live log', () async {
+      final orchestrator = container.read(xpEngineOrchestratorProvider);
+      final result = await orchestrator.importTransactions([
+        importedTx(id: 'i1', timestamp: DateTime.now()),
+      ]);
+
+      expect(result.importedCount, 1);
+      expect(container.read(transactionsProvider), hasLength(1));
+      // A fresh streak day plus one log, same as any first transaction.
+      expect(result.xpGained, kStreakDayXp + kBaseLogXp);
+      expect(container.read(profileProvider)!.currentXP, result.xpGained);
+    });
+
+    test('a row whose id already exists overwrites it, not duplicates it',
+        () async {
+      final orchestrator = container.read(xpEngineOrchestratorProvider);
+      final logged = await orchestrator.logTransaction(
+        amount: 100,
+        type: TransactionType.expense,
+        category: 'Food',
+        timestamp: DateTime.now(),
+      );
+      final id = logged.transaction!.id;
+
+      await orchestrator.importTransactions([
+        importedTx(id: id, amount: 250, category: 'Transport'),
+      ]);
+
+      final all = container.read(transactionsProvider);
+      expect(all, hasLength(1));
+      expect(all.single.amount, 250);
+      expect(all.single.category, 'Transport');
+    });
+
+    test('an imported row can complete a quest and unlock a badge, exactly '
+        'like a live log', () async {
+      await putQuest(countQuest(id: 'iq1', target: 1, reward: 50));
+
+      final orchestrator = container.read(xpEngineOrchestratorProvider);
+      final result = await orchestrator.importTransactions([
+        importedTx(id: 'i2', timestamp: DateTime.now()),
+      ]);
+
+      expect(result.completedQuests.map((q) => q.id), contains('iq1'));
+      expect(
+        result.newlyUnlockedBadges.map((b) => b.id),
+        contains('quest_first'),
+      );
+      expect(result.xpGained, kStreakDayXp + kBaseLogXp + 50);
+    });
+  });
 }
