@@ -20,6 +20,9 @@ abstract class AppTheme {
   static ThemeData _build(Brightness brightness) {
     final isDark = brightness == Brightness.dark;
     final cs = _colorScheme(brightness);
+    // Hoisted: this used to be re-invoked inside ~19 component themes, rebuilding
+    // the whole text theme each time.
+    final text = buildTextTheme(cs, brightness);
 
     return ThemeData(
       useMaterial3: true,
@@ -27,7 +30,7 @@ abstract class AppTheme {
       colorScheme: cs,
       scaffoldBackgroundColor:
           isDark ? AppPalette.canvasDark : AppPalette.canvasLight,
-      textTheme: buildTextTheme(cs, brightness),
+      textTheme: text,
       extensions: [isDark ? AppSemanticColors.dark : AppSemanticColors.light],
       splashFactory: InkSparkle.splashFactory,
       visualDensity: VisualDensity.standard,
@@ -40,7 +43,7 @@ abstract class AppTheme {
         scrolledUnderElevation: 0,
         centerTitle: false,
         titleSpacing: Spacing.lg,
-        titleTextStyle: buildTextTheme(cs, brightness).titleLarge,
+        titleTextStyle: text.titleLarge,
         shape: Border(
           bottom: BorderSide(color: cs.outlineVariant, width: 1),
         ),
@@ -59,7 +62,7 @@ abstract class AppTheme {
         indicatorColor: cs.secondaryContainer,
         elevation: 0,
         labelTextStyle: WidgetStatePropertyAll(
-          buildTextTheme(cs, brightness).labelSmall,
+          text.labelSmall,
         ),
       ),
       cardTheme: CardThemeData(
@@ -80,7 +83,7 @@ abstract class AppTheme {
         focusElevation: 4,
         hoverElevation: 4,
         highlightElevation: 6,
-        extendedTextStyle: buildTextTheme(cs, brightness).labelLarge,
+        extendedTextStyle: text.labelLarge,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.lg),
         ),
@@ -102,7 +105,7 @@ abstract class AppTheme {
           disabledForegroundColor: cs.onTertiary.withValues(alpha: 0.5),
           minimumSize: const Size(0, 48),
           padding: EdgeInsets.symmetric(horizontal: Spacing.xl, vertical: Spacing.md),
-          textStyle: buildTextTheme(cs, brightness).labelLarge,
+          textStyle: text.labelLarge,
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.sm),
@@ -113,7 +116,7 @@ abstract class AppTheme {
         style: TextButton.styleFrom(
           foregroundColor: cs.primary,
           minimumSize: const Size(0, 44),
-          textStyle: buildTextTheme(cs, brightness).labelLarge,
+          textStyle: text.labelLarge,
           padding: EdgeInsets.symmetric(horizontal: Spacing.lg),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.sm),
@@ -124,7 +127,7 @@ abstract class AppTheme {
         style: OutlinedButton.styleFrom(
           foregroundColor: cs.primary,
           minimumSize: const Size(0, 44),
-          textStyle: buildTextTheme(cs, brightness).labelLarge,
+          textStyle: text.labelLarge,
           padding: EdgeInsets.symmetric(horizontal: Spacing.lg),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.sm),
@@ -144,9 +147,9 @@ abstract class AppTheme {
         showCheckmark: false,
         side: BorderSide(color: cs.outlineVariant),
         shape: const StadiumBorder(),
-        labelStyle: buildTextTheme(cs, brightness).labelLarge!
+        labelStyle: text.labelLarge!
             .copyWith(color: cs.onSurface),
-        secondaryLabelStyle: buildTextTheme(cs, brightness).labelLarge!
+        secondaryLabelStyle: text.labelLarge!
             .copyWith(color: cs.onSecondaryContainer),
         labelPadding: EdgeInsets.symmetric(horizontal: Spacing.xs),
         padding: EdgeInsets.symmetric(horizontal: Spacing.md, vertical: Spacing.sm),
@@ -168,7 +171,7 @@ abstract class AppTheme {
           ),
           side: WidgetStatePropertyAll(BorderSide(color: cs.outlineVariant)),
           textStyle: WidgetStatePropertyAll(
-            buildTextTheme(cs, brightness).labelLarge,
+            text.labelLarge,
           ),
           shape: WidgetStatePropertyAll(
             RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.sm)),
@@ -181,8 +184,8 @@ abstract class AppTheme {
       listTileTheme: ListTileThemeData(
         iconColor: cs.onSurfaceVariant,
         textColor: cs.onSurface,
-        titleTextStyle: buildTextTheme(cs, brightness).bodyLarge,
-        subtitleTextStyle: buildTextTheme(cs, brightness).bodySmall!
+        titleTextStyle: text.bodyLarge,
+        subtitleTextStyle: text.bodySmall!
             .copyWith(color: cs.onSurfaceVariant),
         contentPadding: EdgeInsets.symmetric(horizontal: Spacing.lg, vertical: Spacing.xs),
         minLeadingWidth: 24,
@@ -204,8 +207,8 @@ abstract class AppTheme {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.xl),
         ),
-        titleTextStyle: buildTextTheme(cs, brightness).titleLarge,
-        contentTextStyle: buildTextTheme(cs, brightness).bodyMedium,
+        titleTextStyle: text.titleLarge,
+        contentTextStyle: text.bodyMedium,
         insetPadding: EdgeInsets.symmetric(horizontal: Spacing.xl, vertical: Spacing.xl),
         actionsPadding: EdgeInsets.fromLTRB(
           Spacing.lg,
@@ -232,11 +235,11 @@ abstract class AppTheme {
         fillColor: cs.surfaceContainer,
         isDense: false,
         contentPadding: EdgeInsets.symmetric(horizontal: Spacing.lg, vertical: Spacing.md),
-        hintStyle: buildTextTheme(cs, brightness).bodyLarge!
+        hintStyle: text.bodyLarge!
             .copyWith(color: cs.onSurfaceVariant),
-        labelStyle: buildTextTheme(cs, brightness).bodyMedium!
+        labelStyle: text.bodyMedium!
             .copyWith(color: cs.onSurfaceVariant),
-        prefixStyle: buildTextTheme(cs, brightness).bodyLarge!
+        prefixStyle: text.bodyLarge!
             .copyWith(color: cs.onSurfaceVariant),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.sm),
@@ -272,7 +275,7 @@ abstract class AppTheme {
       ),
       snackBarTheme: SnackBarThemeData(
         backgroundColor: cs.inverseSurface,
-        contentTextStyle: buildTextTheme(cs, brightness).bodyMedium!
+        contentTextStyle: text.bodyMedium!
             .copyWith(color: cs.onInverseSurface),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
@@ -285,7 +288,7 @@ abstract class AppTheme {
           color: cs.inverseSurface,
           borderRadius: BorderRadius.circular(AppRadius.xs),
         ),
-        textStyle: buildTextTheme(cs, brightness).bodySmall!
+        textStyle: text.bodySmall!
             .copyWith(color: cs.onInverseSurface),
         padding: EdgeInsets.symmetric(horizontal: Spacing.md, vertical: Spacing.sm),
       ),

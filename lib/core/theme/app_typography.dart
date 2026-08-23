@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+
+/// The bundled typeface. Declared in pubspec.yaml under `fonts:` and shipped as
+/// static .ttf files in assets/fonts/, so it renders offline on first launch —
+/// google_fonts' runtime fetch was never viable in a fully-offline app.
+const String kFontFamily = 'Plus Jakarta Sans';
 
 /// Build the text theme for a given brightness. Called from app_theme.dart.
 TextTheme buildTextTheme(ColorScheme scheme, Brightness brightness) {
@@ -8,10 +12,10 @@ TextTheme buildTextTheme(ColorScheme scheme, Brightness brightness) {
       ? Typography.material2021().white
       : Typography.material2021().black;
 
-  final fontFamily = GoogleFonts.plusJakartaSans().fontFamily;
+  const fontFamily = kFontFamily;
 
-  final onSurface = isDark ? scheme.onSurface : scheme.onSurface;
-  final onSurfaceVariant = isDark ? scheme.onSurfaceVariant : scheme.onSurfaceVariant;
+  final onSurface = scheme.onSurface;
+  final onSurfaceVariant = scheme.onSurfaceVariant;
 
   // Apply font family and colors to base theme
   return base
