@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/database/hive_boxes.dart';
 import 'core/theme/app_theme.dart';
+import 'data/gamification_repair.dart';
 import 'data/quest_repository.dart';
 import 'features/home/home_shell.dart';
 import 'features/onboarding/onboarding_screen.dart';
@@ -15,6 +16,11 @@ Future<void> main() async {
   // Catches quests that passed their endDate while the app was closed —
   // nothing else runs while offline, so this is the one guaranteed checkpoint.
   await QuestRepository().expireOverdueQuests();
+  // Re-derives XP/streak/quests from the transaction list, repairing anything a
+  // partial write left inconsistent — Hive has no cross-box transaction, and
+  // there's no backend to reconcile on a schedule. Must run after quest expiry,
+  // which is time-driven and treated as terminal by the replay.
+  await repairGamificationState();
   runApp(const ProviderScope(child: BrokeNoMoreApp()));
 }
 

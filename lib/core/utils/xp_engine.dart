@@ -20,6 +20,9 @@ const int kUnderBudgetXp = 15;
 
 const int kQuickLogWindowMinutes = 30;
 
+/// Streak freezes granted per 7-day window. See [shouldResetWeeklyFreeze].
+const int kWeeklyStreakFreezeAllowance = 1;
+
 /// Anti-abuse cap: only the first [kMaxXpEligibleLogsPerDay] logs in a
 /// calendar day earn transaction-logging XP (base + quick-log bonus).
 const int kMaxXpEligibleLogsPerDay = 10;

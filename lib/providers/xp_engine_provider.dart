@@ -1,43 +1,70 @@
+import 'dart:math' as math;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/notifications/streak_reminder_service.dart';
 import '../core/utils/badge_engine.dart';
 import '../core/utils/date_helpers.dart';
+import '../core/utils/gamification_replay.dart';
 import '../core/utils/quest_engine.dart';
-import '../core/utils/xp_engine.dart';
+import '../data/transaction_repository.dart';
 import '../models/quest.dart';
 import '../models/transaction.dart';
+import '../models/user_profile.dart';
 import 'badge_provider.dart';
 import 'profile_provider.dart';
 import 'quest_provider.dart';
 import 'transaction_provider.dart';
 
-/// Result of logging a transaction — lets the UI react to badge unlocks
-/// (e.g. a celebration) without the orchestrator knowing about widgets.
+/// Result of any transaction mutation — lets the UI react to XP gains, badge
+/// unlocks and level-ups without the orchestrator knowing about widgets.
 class LogTransactionResult {
   const LogTransactionResult({
     required this.transaction,
     required this.xpGained,
     required this.newlyUnlockedBadges,
     required this.leveledUpTo,
+    required this.completedQuests,
   });
 
-  final Transaction transaction;
+  /// The affected transaction; null for a delete.
+  final Transaction? transaction;
+
+  /// Change in total XP. Can be negative — editing an amount upward can revoke
+  /// a budget bonus, and deleting revokes whatever the row earned. The UI should
+  /// only celebrate a positive value.
   final int xpGained;
+
   final List<BadgeDefinition> newlyUnlockedBadges;
 
-  /// Non-null when this log pushed the profile to a new level.
+  /// Non-null only when the level went *up*. Levels can drop after a delete, but
+  /// there is no "you lost a level" moment — that would be punitive, which the
+  /// PRD rules out.
   final int? leveledUpTo;
+
+  /// Quests that reached `completed` during this mutation, for celebration.
+  final List<Quest> completedQuests;
 }
 
-/// Orchestrates the "log a transaction" flow described in the PRD (section
-/// 8): save the transaction, run the pure XP/streak/quest/badge engines
-/// against it, persist the results, and update every dependent provider so
-/// Home, Profile and Quests screens rebuild reactively from one action.
+/// Orchestrates every mutation to the transaction log.
+///
+/// All three entry points — [logTransaction], [updateTransaction],
+/// [deleteTransaction] — funnel through the same [_mutate], which replays
+/// the gamification state from the full transaction list rather than
+/// accumulating deltas. See [replayGamification] for why an incremental approach
+/// isn't sound once transactions can be edited or deleted.
+///
+/// Because create and mutate share one path, they cannot drift apart: there is
+/// exactly one implementation of "what is this user's XP".
 class XpEngineOrchestrator {
   XpEngineOrchestrator(this._ref);
 
   final Ref _ref;
+
+  /// Serialises mutations. Edit and delete can be triggered by rapid taps on a
+  /// list row, and two overlapping replays would both read the pre-mutation
+  /// profile and race to write it back.
+  bool _busy = false;
 
   Future<LogTransactionResult> logTransaction({
     required double amount,
@@ -46,147 +73,197 @@ class XpEngineOrchestrator {
     String? note,
     required DateTime timestamp,
   }) async {
-    final now = DateTime.now();
-    final transactionRepo = _ref.read(transactionRepositoryProvider);
-    final profileRepo = _ref.read(profileRepositoryProvider);
-
-    final logsAlreadyToday = transactionRepo.countForDay(now);
-
-    final transaction = transactionRepo.add(
-      amount: amount,
-      type: type,
-      category: category,
-      note: note,
-      timestamp: timestamp,
-    );
-    _ref.read(transactionsProvider.notifier).refresh();
-
-    final profile = _ref.read(profileProvider);
-    if (profile == null) {
-      throw StateError('logTransaction called before a profile exists');
-    }
-
-    var xpGained = calculateTransactionLogXp(
-      logsAlreadyToday: logsAlreadyToday,
-      isQuickLog: transaction.isQuickLog,
-    );
-
-    var freezesLeft = profile.streakFreezesLeft;
-    var freezeResetDate = profile.lastFreezeResetDate;
-    if (shouldResetWeeklyFreeze(
-        lastFreezeResetDate: freezeResetDate, today: now)) {
-      freezesLeft = 1;
-      freezeResetDate = now;
-    }
-
-    final streakResult = evaluateStreak(
-      lastLogged: profile.lastLoggedDate,
-      today: now,
-      currentStreak: profile.currentStreak,
-      freezesLeft: freezesLeft,
-    );
-    if (streakResult.streakAdvancedToday) {
-      xpGained += kStreakDayXp;
-    }
-
-    final spentToday = transactionRepo.totalSpentForDay(now);
-    var lastBudgetBonusDate = profile.lastBudgetBonusDate;
-    var daysUnderBudgetCount = profile.daysUnderBudgetCount;
-    if (shouldAwardDailyBudgetBonus(
-      monthlyBudget: profile.monthlyBudget,
-      spentToday: spentToday,
-      lastBudgetBonusDate: lastBudgetBonusDate,
-      today: now,
-    )) {
-      xpGained += kUnderBudgetXp;
-      lastBudgetBonusDate = now;
-      daysUnderBudgetCount += 1;
-    }
-
-    final newXp = profile.currentXP + xpGained;
-    final newLevel = levelForXp(newXp);
-
-    await _updateQuestProgress(
-      transaction: transaction,
-      streak: streakResult.newStreak,
-      today: now,
-    );
-
-    final newlyUnlockedBadges = await _unlockEligibleBadges(
-      transactionCount: transactionRepo.getAll().length,
-      currentStreak: streakResult.newStreak,
-      level: newLevel,
-      daysUnderBudget: daysUnderBudgetCount,
-      now: now,
-    );
-
-    final updatedProfile = profile.copyWith(
-      currentXP: newXp,
-      level: newLevel,
-      currentStreak: streakResult.newStreak,
-      longestStreak: streakResult.newStreak > profile.longestStreak
-          ? streakResult.newStreak
-          : profile.longestStreak,
-      lastLoggedDate: now,
-      streakFreezesLeft: streakResult.freezesLeft,
-      lastFreezeResetDate: freezeResetDate,
-      lastBudgetBonusDate: lastBudgetBonusDate,
-      daysUnderBudgetCount: daysUnderBudgetCount,
-      badgeIds: newlyUnlockedBadges.isEmpty
-          ? profile.badgeIds
-          : [...profile.badgeIds, ...newlyUnlockedBadges.map((b) => b.id)],
-    );
-    await profileRepo.save(updatedProfile);
-    _ref.read(profileProvider.notifier).setProfile(updatedProfile);
-
-    if (updatedProfile.remindersEnabled) {
-      // Today's streak is safe now — don't nag the user this evening.
-      await StreakReminderService.instance.cancelToday();
-    }
-
-    return LogTransactionResult(
-      transaction: transaction,
-      xpGained: xpGained,
-      newlyUnlockedBadges: newlyUnlockedBadges,
-      leveledUpTo: newLevel > profile.level ? newLevel : null,
-    );
+    return _mutate((repo) async {
+      return repo.add(
+        amount: amount,
+        type: type,
+        category: category,
+        note: note,
+        timestamp: timestamp,
+      );
+    });
   }
 
-  Future<void> _updateQuestProgress({
-    required Transaction transaction,
-    required int streak,
-    required DateTime today,
+  /// Applies an edit. Omitted fields keep their current value; pass
+  /// [clearNote] to remove a note rather than passing null, which is
+  /// indistinguishable from "unchanged".
+  Future<LogTransactionResult> updateTransaction({
+    required String id,
+    double? amount,
+    TransactionType? type,
+    String? category,
+    String? note,
+    bool clearNote = false,
+    DateTime? timestamp,
+  }) async {
+    return _mutate((repo) async {
+      final existing = repo.getById(id);
+      if (existing == null) {
+        throw StateError('updateTransaction: no transaction with id $id');
+      }
+      return repo.update(
+        existing,
+        amount: amount,
+        type: type,
+        category: category,
+        note: note,
+        clearNote: clearNote,
+        timestamp: timestamp,
+      );
+    });
+  }
+
+  Future<LogTransactionResult> deleteTransaction(String id) async {
+    return _mutate((repo) async {
+      await repo.delete(id);
+      return null;
+    });
+  }
+
+  /// Recomputes and persists everything downstream of the transaction list,
+  /// after [change] has mutated the box.
+  ///
+  /// Step order is load-bearing: badges depend on the replayed level *and* the
+  /// replayed quest-completion count, so quests must settle before badges are
+  /// evaluated.
+  Future<LogTransactionResult> _mutate(
+    Future<Transaction?> Function(TransactionRepository repo) change,
+  ) async {
+    if (_busy) {
+      throw StateError('A transaction mutation is already in progress');
+    }
+    _busy = true;
+    try {
+      final now = DateTime.now();
+      final transactionRepo = _ref.read(transactionRepositoryProvider);
+      final profileRepo = _ref.read(profileRepositoryProvider);
+
+      final before = _ref.read(profileProvider);
+      if (before == null) {
+        throw StateError('transaction mutation attempted before a profile exists');
+      }
+      final beforeQuestIds = _completedQuestIds();
+
+      // 1. Mutate the box.
+      final touched = await change(transactionRepo);
+      _ref.read(transactionsProvider.notifier).refresh();
+
+      // 2. Replay gamification from the full list.
+      final all = _ref.read(transactionsProvider);
+      final replay = replayGamification(
+        ReplayInput(
+          transactions: all,
+          joinDate: before.joinDate,
+          monthlyBudget: before.monthlyBudget,
+          asOf: now,
+        ),
+      );
+      await transactionRepo.writeBackXp(replay.xpByTransactionId);
+
+      // 3. Replay quests (before badges — badges count completions).
+      await _replayQuests(
+        transactions: all,
+        currentStreak: replay.currentStreak,
+        asOf: now,
+      );
+
+      // 4. Unlock any newly-eligible badges. Additive only.
+      final newlyUnlockedBadges = await _unlockEligibleBadges(
+        transactionCount: all.length,
+        currentStreak: replay.currentStreak,
+        level: replay.level,
+        daysUnderBudget: replay.daysUnderBudgetCount,
+        now: now,
+      );
+
+      // 5. Persist the profile, ratcheting anything that must never regress.
+      final updated = before.copyWith(
+        currentXP: replay.totalXp,
+        level: replay.level,
+        currentStreak: replay.currentStreak,
+        longestStreak: math.max(before.longestStreak, replay.longestStreakSeen),
+        lastLoggedDate: replay.lastLoggedDay ?? before.joinDate,
+        streakFreezesLeft: replay.streakFreezesLeft,
+        lastFreezeResetDate: replay.lastFreezeResetDate,
+        lastBudgetBonusDate: replay.lastBudgetBonusDate,
+        daysUnderBudgetCount: replay.daysUnderBudgetCount,
+        badgeIds: newlyUnlockedBadges.isEmpty
+            ? before.badgeIds
+            : [...before.badgeIds, ...newlyUnlockedBadges.map((b) => b.id)],
+      );
+      await profileRepo.save(updated);
+      _ref.read(profileProvider.notifier).setProfile(updated);
+
+      await _syncReminder(updated, replay.lastLoggedDay, now);
+
+      final completedQuests = _ref
+          .read(questsProvider)
+          .where((q) =>
+              q.status == QuestStatus.completed && !beforeQuestIds.contains(q.id))
+          .toList(growable: false);
+
+      return LogTransactionResult(
+        transaction: touched,
+        xpGained: replay.totalXp - before.currentXP,
+        newlyUnlockedBadges: newlyUnlockedBadges,
+        leveledUpTo: replay.level > before.level ? replay.level : null,
+        completedQuests: completedQuests,
+      );
+    } finally {
+      _busy = false;
+    }
+  }
+
+  Set<String> _completedQuestIds() {
+    return _ref
+        .read(questsProvider)
+        .where((q) => q.status == QuestStatus.completed)
+        .map((q) => q.id)
+        .toSet();
+  }
+
+  Future<void> _replayQuests({
+    required List<Transaction> transactions,
+    required int currentStreak,
+    required DateTime asOf,
   }) async {
     final questRepo = _ref.read(questRepositoryProvider);
-    final transactionRepo = _ref.read(transactionRepositoryProvider);
-    final allTransactions = _ref.read(transactionsProvider);
 
-    for (final quest in questRepo.active) {
-      final sinceStart = allTransactions
-          .where((t) => !startOfDay(t.timestamp).isBefore(startOfDay(quest.startDate)))
-          .toList();
-      final categorySpend = transactionRepo
-          .totalsByCategory(
-            sinceStart.where((t) => t.category == quest.category).toList(),
-          )[quest.category] ??
-          0;
-      final count = sinceStart.length;
-
-      final update = evaluateQuestAfterTransaction(
+    for (final quest in questRepo.getAll()) {
+      final update = replayQuest(
         quest: quest,
-        transaction: transaction,
-        categorySpendSinceStart: categorySpend,
-        transactionCountSinceStart: count,
-        currentStreak: streak,
-        today: today,
+        transactions: transactions,
+        currentStreak: currentStreak,
+        asOf: asOf,
       );
-      if (update == null) continue;
-
+      if (quest.currentProgress == update.progress &&
+          quest.status == update.status) {
+        continue;
+      }
       quest.currentProgress = update.progress;
       quest.status = update.status;
       await quest.save();
     }
     _ref.read(questsProvider.notifier).refresh();
+  }
+
+  /// Keeps the evening streak reminder consistent with the replayed state.
+  /// Deleting today's only transaction has to re-arm the nag it previously
+  /// cancelled, or the user silently loses a day.
+  Future<void> _syncReminder(
+    UserProfile profile,
+    DateTime? lastLoggedDay,
+    DateTime now,
+  ) async {
+    if (!profile.remindersEnabled) return;
+    final loggedToday = lastLoggedDay != null && isSameDay(lastLoggedDay, now);
+    if (loggedToday) {
+      await StreakReminderService.instance.cancelToday();
+    } else {
+      await StreakReminderService.instance.scheduleTonightReminder(
+        currentStreak: profile.currentStreak,
+      );
+    }
   }
 
   Future<List<BadgeDefinition>> _unlockEligibleBadges({
