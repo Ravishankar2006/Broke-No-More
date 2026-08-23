@@ -198,6 +198,40 @@ class XpEngineOrchestrator {
     }
   }
 
+  /// Changes (or clears, when [monthlyBudget] is null) the monthly budget and
+  /// immediately recomputes everything that depends on it.
+  ///
+  /// Previously a budget edit just wrote the new value and stopped — XP,
+  /// `daysUnderBudgetCount` and the Budget Boss badge all stayed stale until
+  /// the user's next transaction, silently jumping only then.
+  Future<void> updateMonthlyBudget(double? monthlyBudget) async {
+    if (_busy) {
+      throw StateError('A transaction mutation is already in progress');
+    }
+    _busy = true;
+    try {
+      final now = DateTime.now();
+      final before = _ref.read(profileProvider);
+      if (before == null) {
+        throw StateError('updateMonthlyBudget attempted before a profile exists');
+      }
+      final beforeQuestIds = _completedQuestIds();
+
+      final withNewBudget = before.copyWith(
+        monthlyBudget: monthlyBudget,
+        clearMonthlyBudget: monthlyBudget == null,
+      );
+
+      await _recomputeAndPersist(
+        now: now,
+        before: withNewBudget,
+        beforeQuestIds: beforeQuestIds,
+      );
+    } finally {
+      _busy = false;
+    }
+  }
+
   /// Runs [change] against the box, then recomputes and persists everything
   /// downstream of the transaction list.
   Future<LogTransactionResult> _mutate(

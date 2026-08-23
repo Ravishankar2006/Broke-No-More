@@ -97,6 +97,10 @@ class UserProfile extends HiveObject {
     int? longestStreak,
     DateTime? lastLoggedDate,
     double? monthlyBudget,
+    // `monthlyBudget: null` is indistinguishable from "not passed" under the
+    // `??` fallback below, so clearing it needs its own explicit flag — same
+    // pattern as TransactionRepository.update's `clearNote`.
+    bool clearMonthlyBudget = false,
     List<String>? badgeIds,
     int? streakFreezesLeft,
     DateTime? lastFreezeResetDate,
@@ -114,7 +118,8 @@ class UserProfile extends HiveObject {
       currentStreak: currentStreak ?? this.currentStreak,
       longestStreak: longestStreak ?? this.longestStreak,
       lastLoggedDate: lastLoggedDate ?? this.lastLoggedDate,
-      monthlyBudget: monthlyBudget ?? this.monthlyBudget,
+      monthlyBudget:
+          clearMonthlyBudget ? null : (monthlyBudget ?? this.monthlyBudget),
       badgeIds: badgeIds ?? this.badgeIds,
       streakFreezesLeft: streakFreezesLeft ?? this.streakFreezesLeft,
       lastFreezeResetDate: lastFreezeResetDate ?? this.lastFreezeResetDate,

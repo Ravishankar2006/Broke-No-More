@@ -283,4 +283,57 @@ void main() {
       expect(result.xpGained, kStreakDayXp + kBaseLogXp + 50);
     });
   });
+
+  group('updateMonthlyBudget', () {
+    test(
+      'setting a budget awards the under-budget bonus immediately, without '
+      'waiting for the next transaction',
+      () async {
+        final orchestrator = container.read(xpEngineOrchestratorProvider);
+        // Logged with no budget set — no bonus is possible yet.
+        await orchestrator.logTransaction(
+          amount: 50,
+          type: TransactionType.expense,
+          category: 'Food',
+          timestamp: DateTime.now(),
+        );
+        final xpBefore = container.read(profileProvider)!.currentXP;
+
+        // 3000/31 (or whichever month) still comfortably covers a ₹50 day.
+        await orchestrator.updateMonthlyBudget(3000);
+
+        final profile = container.read(profileProvider)!;
+        expect(profile.monthlyBudget, 3000);
+        expect(profile.currentXP, xpBefore + kUnderBudgetXp);
+        expect(profile.daysUnderBudgetCount, 1);
+      },
+    );
+
+    test(
+      'clearing a budget revokes the bonus immediately, and the budget is '
+      'actually null afterwards',
+      () async {
+        final orchestrator = container.read(xpEngineOrchestratorProvider);
+        await orchestrator.updateMonthlyBudget(3000);
+        await orchestrator.logTransaction(
+          amount: 50,
+          type: TransactionType.expense,
+          category: 'Food',
+          timestamp: DateTime.now(),
+        );
+        final withBonus = container.read(profileProvider)!;
+        expect(withBonus.daysUnderBudgetCount, 1);
+
+        await orchestrator.updateMonthlyBudget(null);
+
+        final cleared = container.read(profileProvider)!;
+        // The regression this guards: UserProfile.copyWith used
+        // `monthlyBudget ?? this.monthlyBudget`, so passing null could never
+        // actually clear it.
+        expect(cleared.monthlyBudget, isNull);
+        expect(cleared.currentXP, withBonus.currentXP - kUnderBudgetXp);
+        expect(cleared.daysUnderBudgetCount, 0);
+      },
+    );
+  });
 }

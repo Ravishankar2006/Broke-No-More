@@ -205,17 +205,21 @@ class ProfileScreen extends ConsumerWidget {
     final profile = ref.read(profileProvider);
     if (profile == null) return;
 
-    // Owned by the dialog widget so it's disposed with it — the previous
-    // version created a controller per invocation and never disposed it.
-    final result = await showDialog<double?>(
+    // A record, not a bare `double?` — the dialog needs to say "clear it"
+    // distinctly from "cancelled", and a popped `null` already means the
+    // latter. Owned by the dialog widget so it's disposed with it.
+    final result = await showDialog<({bool clear, double? value})>(
       context: context,
       builder: (context) => _BudgetDialog(initial: profile.monthlyBudget),
     );
     if (result == null) return;
 
-    final updated = profile.copyWith(monthlyBudget: result);
-    await ref.read(profileRepositoryProvider).save(updated);
-    ref.read(profileProvider.notifier).setProfile(updated);
+    // Goes through the orchestrator, not a direct repo save — the budget
+    // bonus, daysUnderBudgetCount and the Budget Boss badge all depend on
+    // this value and need recomputing now, not on the next transaction.
+    await ref
+        .read(xpEngineOrchestratorProvider)
+        .updateMonthlyBudget(result.clear ? null : result.value);
   }
 
   Future<void> _toggleReminders(
@@ -724,7 +728,7 @@ class _BudgetDialogState extends State<_BudgetDialog> {
       setState(() => _error = 'Enter an amount above zero');
       return;
     }
-    Navigator.of(context).pop(value);
+    Navigator.of(context).pop((clear: false, value: value));
   }
 
   @override
@@ -755,6 +759,14 @@ class _BudgetDialogState extends State<_BudgetDialog> {
         ],
       ),
       actions: [
+        // Only offered once a budget actually exists — clearing an unset
+        // budget isn't a meaningful action.
+        if (widget.initial != null)
+          TextButton(
+            onPressed: () =>
+                Navigator.of(context).pop((clear: true, value: null)),
+            child: const Text('Clear'),
+          ),
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Cancel'),

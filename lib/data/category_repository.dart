@@ -18,6 +18,7 @@ class CategoryRepository {
     required String name,
     required String iconId,
     required TransactionType type,
+    double? budget,
   }) async {
     final record = CategoryRecord(
       id: const Uuid().v4(),
@@ -25,6 +26,7 @@ class CategoryRepository {
       iconId: iconId,
       type: type,
       sortOrder: getAll(type).length,
+      budget: budget,
     );
     await _box.add(record);
     return record;
@@ -34,10 +36,12 @@ class CategoryRepository {
     CategoryRecord record, {
     required String name,
     required String iconId,
+    double? budget,
   }) async {
     record
       ..name = name
-      ..iconId = iconId;
+      ..iconId = iconId
+      ..budget = budget;
     await record.save();
   }
 

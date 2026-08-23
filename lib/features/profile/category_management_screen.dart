@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_dimens.dart';
 import '../../core/theme/app_motion.dart';
 import '../../core/utils/category_icons.dart';
+import '../../core/utils/currency_formatter.dart';
 import '../../models/category_record.dart';
 import '../../models/transaction.dart';
 import '../../providers/category_provider.dart';
@@ -26,17 +27,28 @@ class _CategoryManagementScreenState
   }
 
   Future<void> _openEditor({CategoryRecord? existing}) async {
-    final result = await showDialog<({String name, String iconId})>(
+    final result =
+        await showDialog<({String name, String iconId, double? budget})>(
       context: context,
-      builder: (_) => _CategoryEditorDialog(existing: existing),
+      builder: (_) => _CategoryEditorDialog(type: _type, existing: existing),
     );
     if (result == null) return;
 
     final repo = ref.read(categoryRepositoryProvider);
     if (existing == null) {
-      await repo.add(name: result.name, iconId: result.iconId, type: _type);
+      await repo.add(
+        name: result.name,
+        iconId: result.iconId,
+        type: _type,
+        budget: result.budget,
+      );
     } else {
-      await repo.update(existing, name: result.name, iconId: result.iconId);
+      await repo.update(
+        existing,
+        name: result.name,
+        iconId: result.iconId,
+        budget: result.budget,
+      );
     }
     _refresh();
   }
@@ -159,6 +171,9 @@ class _CategoryManagementScreenState
                   key: ValueKey(category.id),
                   leading: Icon(categoryIcon(category.iconId)),
                   title: Text(category.name),
+                  subtitle: category.budget != null
+                      ? Text('Budget: ${formatCurrency(category.budget!)}/mo')
+                      : null,
                   onTap: () => _openEditor(existing: category),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -195,8 +210,9 @@ class _CategoryManagementScreenState
 }
 
 class _CategoryEditorDialog extends StatefulWidget {
-  const _CategoryEditorDialog({this.existing});
+  const _CategoryEditorDialog({required this.type, this.existing});
 
+  final TransactionType type;
   final CategoryRecord? existing;
 
   @override
@@ -206,11 +222,16 @@ class _CategoryEditorDialog extends StatefulWidget {
 class _CategoryEditorDialogState extends State<_CategoryEditorDialog> {
   late final _nameController =
       TextEditingController(text: widget.existing?.name ?? '');
+  late final _budgetController = TextEditingController(
+    text: widget.existing?.budget?.toStringAsFixed(0) ?? '',
+  );
   late String _iconId = widget.existing?.iconId ?? kCategoryIconChoices.keys.first;
+  String? _budgetError;
 
   @override
   void dispose() {
     _nameController.dispose();
+    _budgetController.dispose();
     super.dispose();
   }
 
@@ -228,6 +249,21 @@ class _CategoryEditorDialogState extends State<_CategoryEditorDialog> {
               autofocus: true,
               decoration: const InputDecoration(labelText: 'Name'),
             ),
+            // Budgets are a spending concept — offering one for an income
+            // category ("cap how much I earn") wouldn't mean anything.
+            if (widget.type == TransactionType.expense) ...[
+              SizedBox(height: Spacing.lg),
+              TextField(
+                controller: _budgetController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(
+                  labelText: 'Monthly budget (optional)',
+                  prefixText: '₹ ',
+                  hintText: 'e.g. 2000',
+                  errorText: _budgetError,
+                ),
+              ),
+            ],
             SizedBox(height: Spacing.lg),
             Text('Icon', style: Theme.of(context).textTheme.titleSmall),
             SizedBox(height: Spacing.sm),
@@ -285,7 +321,20 @@ class _CategoryEditorDialogState extends State<_CategoryEditorDialog> {
           onPressed: () {
             final name = _nameController.text.trim();
             if (name.isEmpty) return;
-            Navigator.of(context).pop((name: name, iconId: _iconId));
+
+            double? budget;
+            if (widget.type == TransactionType.expense) {
+              final budgetText = _budgetController.text.trim();
+              if (budgetText.isNotEmpty) {
+                budget = double.tryParse(budgetText);
+                if (budget == null || budget <= 0) {
+                  setState(() => _budgetError = 'Enter an amount above zero');
+                  return;
+                }
+              }
+            }
+            Navigator.of(context)
+                .pop((name: name, iconId: _iconId, budget: budget));
           },
           child: const Text('Save'),
         ),

@@ -22,13 +22,14 @@ class CategoryRecordAdapter extends TypeAdapter<CategoryRecord> {
       iconId: fields[2] as String,
       type: fields[3] as TransactionType,
       sortOrder: fields[4] as int,
+      budget: fields[5] as double?,
     );
   }
 
   @override
   void write(BinaryWriter writer, CategoryRecord obj) {
     writer
-      ..writeByte(5)
+      ..writeByte(6)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -38,7 +39,9 @@ class CategoryRecordAdapter extends TypeAdapter<CategoryRecord> {
       ..writeByte(3)
       ..write(obj.type)
       ..writeByte(4)
-      ..write(obj.sortOrder);
+      ..write(obj.sortOrder)
+      ..writeByte(5)
+      ..write(obj.budget);
   }
 
   @override

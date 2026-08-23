@@ -5,10 +5,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_dimens.dart';
 import '../../core/theme/app_motion.dart';
 import '../../core/theme/app_semantic_colors.dart';
+import '../../core/utils/category_icons.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/date_helpers.dart';
+import '../../models/category_record.dart';
 import '../../models/transaction.dart';
+import '../../providers/category_provider.dart';
 import '../../providers/transaction_provider.dart';
+import '../../shared_widgets/animated_progress_bar.dart';
 import '../../shared_widgets/app_card.dart';
 import '../../shared_widgets/empty_state.dart';
 import '../../shared_widgets/section_header.dart';
@@ -105,6 +109,16 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
     final categoryColors =
         _assignCategoryColors(byCategory.keys, semantics.chartPalette);
 
+    // Budgets are a calendar-month concept (matching dailyBudgetFor's own
+    // proration), so this deliberately ignores the range selector above —
+    // switching to "Week" shouldn't make a category's monthly budget look
+    // unspent.
+    final budgetedCategories = ref
+        .watch(expenseCategoriesProvider)
+        .where((c) => c.budget != null)
+        .toList();
+    final monthToDateByCategory = _monthToDateByCategory(transactions, now);
+
     return Scaffold(
       body: CustomScrollView(
         slivers: [
@@ -149,6 +163,14 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                     total: current.total,
                     colors: categoryColors,
                   ),
+                  if (budgetedCategories.isNotEmpty) ...[
+                    SizedBox(height: Spacing.xl),
+                    SectionHeader(title: 'Category budgets'),
+                    _CategoryBudgetsCard(
+                      categories: budgetedCategories,
+                      spentByCategory: monthToDateByCategory,
+                    ),
+                  ],
                   SizedBox(height: Spacing.xl),
                   SectionHeader(title: 'Daily trend'),
                   _TrendChart(window: current, range: _range),
@@ -235,6 +257,21 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
   static Map<String, double> _totalsByCategory(_Window window) {
     final totals = <String, double>{};
     for (final t in window.expenses) {
+      totals[t.category] = (totals[t.category] ?? 0) + t.amount;
+    }
+    return totals;
+  }
+
+  static Map<String, double> _monthToDateByCategory(
+    List<Transaction> transactions,
+    DateTime now,
+  ) {
+    final totals = <String, double>{};
+    for (final t in transactions) {
+      if (t.type != TransactionType.expense) continue;
+      if (t.timestamp.year != now.year || t.timestamp.month != now.month) {
+        continue;
+      }
       totals[t.category] = (totals[t.category] ?? 0) + t.amount;
     }
     return totals;
@@ -574,6 +611,90 @@ class _CategoryBreakdownState extends State<_CategoryBreakdown> {
   int _percent(double value) {
     if (widget.total <= 0) return 0;
     return (value / widget.total * 100).round();
+  }
+}
+
+/// Spend-this-month against each category that has a budget set (Profile >
+/// Manage categories) — only categories that opted in appear here.
+class _CategoryBudgetsCard extends StatelessWidget {
+  const _CategoryBudgetsCard({
+    required this.categories,
+    required this.spentByCategory,
+  });
+
+  final List<CategoryRecord> categories;
+  final Map<String, double> spentByCategory;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      child: Column(
+        children: [
+          for (var i = 0; i < categories.length; i++)
+            Padding(
+              padding: EdgeInsets.only(
+                bottom: i == categories.length - 1 ? 0 : Spacing.lg,
+              ),
+              child: _CategoryBudgetRow(
+                category: categories[i],
+                spent: spentByCategory[categories[i].name] ?? 0,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CategoryBudgetRow extends StatelessWidget {
+  const _CategoryBudgetRow({required this.category, required this.spent});
+
+  final CategoryRecord category;
+  final double spent;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final semantics = context.semantics;
+    final budget = category.budget!;
+    final isOver = spent > budget;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              categoryIcon(category.iconId),
+              size: 18,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+            SizedBox(width: Spacing.sm),
+            Expanded(
+              child: Text(
+                category.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodyMedium,
+              ),
+            ),
+            Text(
+              '${formatCurrency(spent)} / ${formatCurrency(budget)}',
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: isOver ? semantics.expenseInk : null,
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: Spacing.sm),
+        AnimatedProgressBar(
+          value: budget == 0 ? 0 : spent / budget,
+          variant: ProgressVariant.budget,
+          isOver: isOver,
+        ),
+      ],
+    );
   }
 }
 

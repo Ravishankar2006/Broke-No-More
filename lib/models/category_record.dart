@@ -17,6 +17,7 @@ class CategoryRecord extends HiveObject {
     required this.iconId,
     required this.type,
     required this.sortOrder,
+    this.budget,
   });
 
   @HiveField(0)
@@ -33,4 +34,11 @@ class CategoryRecord extends HiveObject {
 
   @HiveField(4)
   int sortOrder;
+
+  /// Optional monthly spending cap for this category. Expense categories
+  /// only in practice — the editor doesn't offer it for income — but not
+  /// enforced at the model layer, matching how [TransactionType] itself
+  /// isn't restricted here either.
+  @HiveField(5)
+  double? budget;
 }
