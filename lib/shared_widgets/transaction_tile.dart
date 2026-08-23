@@ -46,12 +46,16 @@ class TransactionTile extends ConsumerWidget {
     final icon = iconId == null ? Icons.category : categoryIcon(iconId);
 
     final xp = transaction.xpAwarded;
+    final note = transaction.note?.trim();
+    // Never fall back to the category — it's already the title, so a note-less
+    // row used to render "Groceries / Groceries". Time is the useful secondary
+    // detail when there's no note.
     final subtitle = [
       if (showDate) _formatDay(transaction.timestamp),
-      if (transaction.note != null && transaction.note!.trim().isNotEmpty)
-        transaction.note!.trim()
+      if (note != null && note.isNotEmpty)
+        note
       else
-        transaction.category,
+        _formatTime(transaction.timestamp),
     ].join(' · ');
 
     return Material(
@@ -126,6 +130,12 @@ class TransactionTile extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  static String _formatTime(DateTime date) {
+    final hour = date.hour % 12 == 0 ? 12 : date.hour % 12;
+    final minute = date.minute.toString().padLeft(2, '0');
+    return '$hour:$minute ${date.hour < 12 ? 'am' : 'pm'}';
   }
 
   static String _formatDay(DateTime date) {

@@ -52,11 +52,11 @@ class AnimatedProgressBar extends StatelessWidget {
     final brightness = Theme.of(context).brightness;
     final clamped = value.clamp(0.0, 1.0);
 
-    final track = switch (variant) {
-      ProgressVariant.xp => semantics.xpTrack,
-      ProgressVariant.budget => semantics.barTrack,
-      ProgressVariant.quest => semantics.barTrack,
-    };
+    // One neutral track for every variant. A gold-tinted track for the XP bar
+    // reads as almost nothing against a white card, which made the bar look
+    // like a floating pill with no indication of the distance left to cover.
+    // The fill colour is what distinguishes the variants.
+    final track = semantics.barTrack;
 
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: clamped),
@@ -66,37 +66,39 @@ class AnimatedProgressBar extends StatelessWidget {
         return ClipRRect(
           borderRadius: BorderRadius.circular(AppRadius.pill),
           child: Container(
+            // Explicitly full width. Callers place this inside a Column with
+            // CrossAxisAlignment.start, which passes a *loose* width; a
+            // Container then sizes to its child, so the track ended up exactly
+            // as wide as the fill and was invisible as a track at all.
+            width: double.infinity,
             height: _height,
             color: track,
-            child: Align(
+            // FractionallySizedBox directly, with heightFactor: 1.
+            //
+            // Wrapping it in an Align first loosens the height constraint, and
+            // a childless DecoratedBox then collapses to zero height — so the
+            // fill was invisible on every bar in the app while the track still
+            // rendered, which looked like "progress is always empty".
+            child: FractionallySizedBox(
               alignment: Alignment.centerLeft,
-              child: FractionallySizedBox(
-                // A zero-width fill would clip the pill radius into nothing and
-                // flicker; keep a sliver visible once there's any progress.
-                widthFactor: animated <= 0 ? 0 : animated.clamp(0.02, 1.0),
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: switch (variant) {
-                      ProgressVariant.xp => AppGradients.xp(brightness),
-                      ProgressVariant.budget => null,
-                      ProgressVariant.quest => null,
-                    },
-                    color: switch (variant) {
-                      ProgressVariant.xp => null,
-                      ProgressVariant.budget =>
-                        isOver ? semantics.budgetOver : semantics.budgetUnder,
-                      ProgressVariant.quest => semantics.xp,
-                    },
-                    borderRadius: BorderRadius.circular(AppRadius.pill),
-                    boxShadow: variant == ProgressVariant.xp
-                        ? [
-                            BoxShadow(
-                              color: semantics.xp.withValues(alpha: 0.45),
-                              blurRadius: 10,
-                            ),
-                          ]
-                        : null,
-                  ),
+              heightFactor: 1,
+              // A zero-width fill would clip the pill radius into nothing and
+              // flicker; keep a sliver visible once there's any progress.
+              widthFactor: animated <= 0 ? 0 : animated.clamp(0.02, 1.0),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: switch (variant) {
+                    ProgressVariant.xp => AppGradients.xp(brightness),
+                    ProgressVariant.budget => null,
+                    ProgressVariant.quest => null,
+                  },
+                  color: switch (variant) {
+                    ProgressVariant.xp => null,
+                    ProgressVariant.budget =>
+                      isOver ? semantics.budgetOver : semantics.budgetUnder,
+                    ProgressVariant.quest => semantics.xp,
+                  },
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
                 ),
               ),
             ),

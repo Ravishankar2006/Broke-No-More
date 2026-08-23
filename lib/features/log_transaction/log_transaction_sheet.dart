@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_dimens.dart';
+import '../../core/theme/app_elevation.dart';
 import '../../core/theme/app_motion.dart';
 import '../../core/theme/app_semantic_colors.dart';
 import '../../core/utils/category_icons.dart';
@@ -171,8 +172,9 @@ class _LogTransactionSheetState extends ConsumerState<LogTransactionSheet> {
       }
     }
 
-    final accent =
-        _type == TransactionType.expense ? semantics.expense : semantics.income;
+    final accent = _type == TransactionType.expense
+        ? semantics.expense
+        : semantics.income;
 
     return Padding(
       padding: EdgeInsets.only(
@@ -227,29 +229,38 @@ class _LogTransactionSheetState extends ConsumerState<LogTransactionSheet> {
                         ),
                       ),
                       SizedBox(width: Spacing.sm),
-                      IntrinsicWidth(
-                        child: TextField(
-                          controller: _amountController,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                          autofocus: !widget.isEditing,
-                          textAlign: TextAlign.center,
-                          style: theme.textTheme.displaySmall?.copyWith(
-                            fontWeight: FontWeight.w800,
-                            color: accent,
-                          ),
-                          decoration: InputDecoration(
-                            hintText: '0',
-                            filled: false,
-                            border: InputBorder.none,
-                            enabledBorder: InputBorder.none,
-                            focusedBorder: InputBorder.none,
-                            contentPadding: EdgeInsets.zero,
-                            isDense: true,
-                            hintStyle: theme.textTheme.displaySmall?.copyWith(
+                      // IntrinsicWidth alone collapses to the hint's width, so
+                      // an empty field rendered as a bare cursor next to the
+                      // rupee sign and looked broken. A minimum keeps the
+                      // target tappable and the zero legible.
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(minWidth: 90),
+                        child: IntrinsicWidth(
+                          child: TextField(
+                            controller: _amountController,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            autofocus: !widget.isEditing,
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.displaySmall?.copyWith(
                               fontWeight: FontWeight.w800,
-                              color: cs.onSurfaceVariant.withValues(alpha: 0.4),
+                              color: accent,
+                            ),
+                            decoration: InputDecoration(
+                              hintText: '0',
+                              filled: false,
+                              border: InputBorder.none,
+                              enabledBorder: InputBorder.none,
+                              focusedBorder: InputBorder.none,
+                              contentPadding: EdgeInsets.zero,
+                              isDense: true,
+                              hintStyle: theme.textTheme.displaySmall?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                color: cs.onSurfaceVariant.withValues(
+                                  alpha: 0.7,
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -260,8 +271,9 @@ class _LogTransactionSheetState extends ConsumerState<LogTransactionSheet> {
                     SizedBox(height: Spacing.sm),
                     Text(
                       _amountError!,
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(color: cs.error),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: cs.error,
+                      ),
                     ),
                   ],
                   SizedBox(height: Spacing.md),
@@ -351,6 +363,10 @@ class _TypeToggle extends StatelessWidget {
     final semantics = context.semantics;
     final cs = Theme.of(context).colorScheme;
 
+    Color accentFor(TransactionType option) => option == TransactionType.expense
+        ? semantics.expenseInk
+        : semantics.incomeInk;
+
     return Container(
       padding: EdgeInsets.all(Spacing.xs),
       decoration: BoxDecoration(
@@ -369,12 +385,16 @@ class _TypeToggle extends StatelessWidget {
                   curve: AppMotion.standardCurve,
                   padding: EdgeInsets.symmetric(vertical: Spacing.sm),
                   decoration: BoxDecoration(
-                    color: type == option
-                        ? (option == TransactionType.expense
-                            ? semantics.expense
-                            : semantics.income)
-                        : Colors.transparent,
+                    // A raised neutral pill carries the selection; the semantic
+                    // colour is applied to the label instead. Filling the whole
+                    // segment with saturated red meant the sheet opened
+                    // shouting, on its *default* state — the PRD is explicit
+                    // that the app must not feel punitive.
+                    color: type == option ? cs.surface : Colors.transparent,
                     borderRadius: BorderRadius.circular(AppRadius.pill),
+                    boxShadow: type == option
+                        ? AppShadows.card(Theme.of(context).brightness)
+                        : null,
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -385,7 +405,7 @@ class _TypeToggle extends StatelessWidget {
                             : Icons.south_west,
                         size: 18,
                         color: type == option
-                            ? Colors.white
+                            ? accentFor(option)
                             : cs.onSurfaceVariant,
                       ),
                       SizedBox(width: Spacing.sm),
@@ -393,12 +413,12 @@ class _TypeToggle extends StatelessWidget {
                         option == TransactionType.expense
                             ? 'Expense'
                             : 'Income',
-                        style:
-                            Theme.of(context).textTheme.labelLarge?.copyWith(
-                                  color: type == option
-                                      ? Colors.white
-                                      : cs.onSurfaceVariant,
-                                ),
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          color: type == option
+                              ? accentFor(option)
+                              : cs.onSurfaceVariant,
+                          fontWeight: type == option ? FontWeight.w700 : null,
+                        ),
                       ),
                     ],
                   ),
@@ -426,8 +446,8 @@ class _DateChip extends StatelessWidget {
     final label = isSameDay(date, now)
         ? 'Today'
         : isSameDay(date, now.subtract(const Duration(days: 1)))
-            ? 'Yesterday'
-            : _format(date);
+        ? 'Yesterday'
+        : _format(date);
 
     return ActionChip(
       onPressed: onTap,
@@ -439,8 +459,18 @@ class _DateChip extends StatelessWidget {
 
   static String _format(DateTime date) {
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     return '${date.day} ${months[date.month - 1]} ${date.year}';
   }
@@ -492,7 +522,7 @@ class _CategoryGrid extends StatelessWidget {
               maxCrossAxisExtent: 92,
               mainAxisSpacing: 8,
               crossAxisSpacing: 8,
-              childAspectRatio: 0.92,
+              childAspectRatio: 0.88,
             ),
             itemCount: categories.length,
             itemBuilder: (context, index) {
@@ -547,10 +577,14 @@ class _CategoryCell extends StatelessWidget {
             ),
             SizedBox(height: Spacing.xs),
             Padding(
-              padding: EdgeInsets.symmetric(horizontal: Spacing.xs),
+              // Tight, so "Entertainment" fits on one line instead of
+              // breaking a single trailing letter onto a second.
+              padding: EdgeInsets.symmetric(horizontal: Spacing.xxs),
               child: Text(
                 category.name,
-                maxLines: 1,
+                // Two lines: names like "Bills & Utilities" and "Rent &
+                // Housing" truncated to an unreadable stub on one.
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
                 style: theme.textTheme.labelSmall?.copyWith(
