@@ -133,13 +133,11 @@ class ProfileScreen extends ConsumerWidget {
                   padding: EdgeInsets.symmetric(vertical: Spacing.xs),
                   child: Column(
                     children: [
-                      _SwitchTile(
+                      _SettingsTile(
                         icon: Icons.dark_mode_outlined,
-                        title: 'Dark mode',
-                        value: themeMode == ThemeMode.dark,
-                        onChanged: (value) => ref
-                            .read(themeModeProvider.notifier)
-                            .setDark(value),
+                        title: 'Appearance',
+                        subtitle: _themeModeLabel(themeMode),
+                        onTap: () => _editThemeMode(context, ref, themeMode),
                       ),
                       const _TileDivider(),
                       _SwitchTile(
@@ -171,6 +169,19 @@ class ProfileScreen extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _editThemeMode(
+    BuildContext context,
+    WidgetRef ref,
+    ThemeMode current,
+  ) async {
+    final result = await showDialog<ThemeMode>(
+      context: context,
+      builder: (context) => _ThemeModeDialog(current: current),
+    );
+    if (result == null) return;
+    await ref.read(themeModeProvider.notifier).setMode(result);
   }
 
   Future<void> _editBudget(BuildContext context, WidgetRef ref) async {
@@ -410,6 +421,48 @@ class _StatsGrid extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+String _themeModeLabel(ThemeMode mode) {
+  return switch (mode) {
+    ThemeMode.system => 'System',
+    ThemeMode.light => 'Light',
+    ThemeMode.dark => 'Dark',
+  };
+}
+
+class _ThemeModeDialog extends StatelessWidget {
+  const _ThemeModeDialog({required this.current});
+
+  final ThemeMode current;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Appearance'),
+      content: RadioGroup<ThemeMode>(
+        groupValue: current,
+        onChanged: (value) => Navigator.of(context).pop(value),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final mode in ThemeMode.values)
+              RadioListTile<ThemeMode>(
+                contentPadding: EdgeInsets.zero,
+                title: Text(_themeModeLabel(mode)),
+                value: mode,
+              ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+      ],
     );
   }
 }

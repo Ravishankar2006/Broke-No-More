@@ -122,6 +122,21 @@ void main() {
     });
   });
 
+  group('dailyBudgetFor', () {
+    test('prorates by the actual month length, not a flat /30', () {
+      // February 2026 (non-leap) has 28 days: 2800/28 = 100/day, not
+      // 2800/30 ≈ 93.33 — the mismatch that used to let Home's "on track"
+      // pill disagree with whether the engine paid out the budget bonus.
+      expect(dailyBudgetFor(2800, DateTime(2026, 2, 15)), 100);
+    });
+
+    test('a 31-day month gives a smaller daily share than a 30-day month', () {
+      final jan = dailyBudgetFor(3100, DateTime(2026, 1, 15));
+      final apr = dailyBudgetFor(3100, DateTime(2026, 4, 15));
+      expect(jan, lessThan(apr));
+    });
+  });
+
   group('shouldAwardDailyBudgetBonus', () {
     final today = DateTime(2026, 8, 22);
 

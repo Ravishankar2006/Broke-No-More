@@ -283,11 +283,8 @@ class _SpendingCard extends StatelessWidget {
     final semantics = context.semantics;
     final budget = profile.monthlyBudget;
 
-    // Prorate against the actual month length. The old `monthlyBudget / 30`
-    // was wrong for every month except June/September/November/April.
     final now = DateTime.now();
-    final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
-    final dailyBudget = budget == null ? null : budget / daysInMonth;
+    final dailyBudget = budget == null ? null : dailyBudgetFor(budget, now);
     final isOver = dailyBudget != null && spentToday > dailyBudget;
 
     final monthToDate = transactions

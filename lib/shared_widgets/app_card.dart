@@ -23,7 +23,6 @@ class AppCard extends StatelessWidget {
     this.padding,
     this.onTap,
     this.color,
-    this.crossAxisAlignment = CrossAxisAlignment.start,
   })  : gradient = null,
         _elevated = false;
 
@@ -36,7 +35,6 @@ class AppCard extends StatelessWidget {
     required this.gradient,
     this.padding,
     this.onTap,
-    this.crossAxisAlignment = CrossAxisAlignment.start,
   })  : color = null,
         _elevated = true;
 
@@ -45,7 +43,6 @@ class AppCard extends StatelessWidget {
   final VoidCallback? onTap;
   final Color? color;
   final Gradient? gradient;
-  final CrossAxisAlignment crossAxisAlignment;
   final bool _elevated;
 
   @override

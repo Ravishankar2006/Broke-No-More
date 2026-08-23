@@ -63,15 +63,22 @@ Future<void> repairGamificationState() async {
     await quest.save();
   }
 
+  // Fold quest-completion XP into the transaction-derived total. Must use
+  // the same combination as XpEngineOrchestrator._mutate, or quest XP
+  // granted during a live session is erased the next time the app boots.
+  final allQuests = questRepo.getAll();
+  final totals = combineXpWithQuests(
+    transactionXp: replay.totalXp,
+    quests: allQuests,
+  );
+
   final badgeRepo = BadgeRepository();
-  final questsCompleted = questRepo
-      .getAll()
-      .where((q) => q.status == QuestStatus.completed)
-      .length;
+  final questsCompleted =
+      allQuests.where((q) => q.status == QuestStatus.completed).length;
   final newlyUnlocked = evaluateNewlyUnlockedBadges(
     transactionCount: transactions.length,
     currentStreak: replay.currentStreak,
-    level: replay.level,
+    level: totals.level,
     questsCompleted: questsCompleted,
     daysUnderBudget: replay.daysUnderBudgetCount,
     alreadyUnlockedIds: badgeRepo.unlockedIds,
@@ -82,8 +89,8 @@ Future<void> repairGamificationState() async {
 
   await profileRepo.save(
     profile.copyWith(
-      currentXP: replay.totalXp,
-      level: replay.level,
+      currentXP: totals.totalXp,
+      level: totals.level,
       currentStreak: replay.currentStreak,
       // Ratchet: a record must survive history being edited away.
       longestStreak: math.max(profile.longestStreak, replay.longestStreakSeen),

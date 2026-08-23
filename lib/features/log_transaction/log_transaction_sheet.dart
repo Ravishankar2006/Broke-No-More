@@ -129,26 +129,40 @@ class _LogTransactionSheetState extends ConsumerState<LogTransactionSheet> {
     final note = _noteController.text.trim();
     final orchestrator = ref.read(xpEngineOrchestratorProvider);
 
-    final result = widget.isEditing
-        ? await orchestrator.updateTransaction(
-            id: widget.existing!.id,
-            amount: _amount,
-            type: _type,
-            category: _category!.name,
-            note: note.isEmpty ? null : note,
-            clearNote: note.isEmpty,
-            timestamp: _date,
-          )
-        : await orchestrator.logTransaction(
-            amount: _amount!,
-            type: _type,
-            category: _category!.name,
-            note: note.isEmpty ? null : note,
-            timestamp: _date,
-          );
+    try {
+      final result = widget.isEditing
+          ? await orchestrator.updateTransaction(
+              id: widget.existing!.id,
+              amount: _amount,
+              type: _type,
+              category: _category!.name,
+              note: note.isEmpty ? null : note,
+              clearNote: note.isEmpty,
+              timestamp: _date,
+            )
+          : await orchestrator.logTransaction(
+              amount: _amount!,
+              type: _type,
+              category: _category!.name,
+              note: note.isEmpty ? null : note,
+              timestamp: _date,
+            );
 
-    if (!mounted) return;
-    Navigator.of(context).pop(result);
+      if (!mounted) return;
+      Navigator.of(context).pop(result);
+    } catch (_) {
+      // The orchestrator throws on a re-entrant mutation or a disk error.
+      // Without this, `_saving` stayed true forever and the Save button
+      // was permanently dead — the only feedback was a red unhandled-error
+      // screen in debug and nothing at all in release.
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Couldn't save — please try again."),
+        ),
+      );
+    }
   }
 
   @override

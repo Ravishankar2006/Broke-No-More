@@ -74,7 +74,7 @@ class XpEngineOrchestrator {
     required DateTime timestamp,
   }) async {
     return _mutate((repo) async {
-      return repo.add(
+      return await repo.add(
         amount: amount,
         type: type,
         category: category,
@@ -167,19 +167,27 @@ class XpEngineOrchestrator {
         asOf: now,
       );
 
+      // 3b. Fold quest-completion XP into the transaction-derived total —
+      // must happen after quests have settled, so a quest that just
+      // completed this mutation is already counted.
+      final totals = combineXpWithQuests(
+        transactionXp: replay.totalXp,
+        quests: _ref.read(questsProvider),
+      );
+
       // 4. Unlock any newly-eligible badges. Additive only.
       final newlyUnlockedBadges = await _unlockEligibleBadges(
         transactionCount: all.length,
         currentStreak: replay.currentStreak,
-        level: replay.level,
+        level: totals.level,
         daysUnderBudget: replay.daysUnderBudgetCount,
         now: now,
       );
 
       // 5. Persist the profile, ratcheting anything that must never regress.
       final updated = before.copyWith(
-        currentXP: replay.totalXp,
-        level: replay.level,
+        currentXP: totals.totalXp,
+        level: totals.level,
         currentStreak: replay.currentStreak,
         longestStreak: math.max(before.longestStreak, replay.longestStreakSeen),
         lastLoggedDate: replay.lastLoggedDay ?? before.joinDate,
@@ -204,9 +212,9 @@ class XpEngineOrchestrator {
 
       return LogTransactionResult(
         transaction: touched,
-        xpGained: replay.totalXp - before.currentXP,
+        xpGained: totals.totalXp - before.currentXP,
         newlyUnlockedBadges: newlyUnlockedBadges,
-        leveledUpTo: replay.level > before.level ? replay.level : null,
+        leveledUpTo: totals.level > before.level ? totals.level : null,
         completedQuests: completedQuests,
       );
     } finally {

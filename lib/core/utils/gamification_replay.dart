@@ -40,6 +40,7 @@
 /// list and therefore idempotent.
 library;
 
+import '../../models/quest.dart';
 import '../../models/transaction.dart';
 import 'date_helpers.dart';
 import 'xp_engine.dart';
@@ -116,6 +117,37 @@ class ReplayResult {
   /// XP attributable to each transaction, keyed by id. Transactions dated after
   /// [ReplayInput.asOf], or beyond the daily cap, map to 0.
   final Map<String, int> xpByTransactionId;
+}
+
+/// Final XP/level, after folding in quest-completion rewards.
+class GamificationTotals {
+  const GamificationTotals({required this.totalXp, required this.level});
+
+  final int totalXp;
+  final int level;
+}
+
+/// Adds quest-completion XP on top of [ReplayResult.totalXp].
+///
+/// Quest XP is ratcheted by the caller, never computed inside
+/// [replayGamification] itself — same doctrine as badges and `longestStreak`
+/// (see the class docs above): it's safe here because [Quest.status] treats
+/// `completed` as sticky, so this sum is monotonic and idempotent no matter
+/// how many times a mutation replays it.
+///
+/// Both mutation paths — [XpEngineOrchestrator] and the boot-time
+/// `repairGamificationState` — must call this with the *same*
+/// transaction-derived XP and the *same* quest list, or quest XP granted by
+/// one will be silently erased by the other on the next run.
+GamificationTotals combineXpWithQuests({
+  required int transactionXp,
+  required List<Quest> quests,
+}) {
+  final questXp = quests
+      .where((q) => q.status == QuestStatus.completed)
+      .fold<int>(0, (sum, q) => sum + q.xpReward);
+  final totalXp = transactionXp + questXp;
+  return GamificationTotals(totalXp: totalXp, level: levelForXp(totalXp));
 }
 
 /// Replays [input] and returns the resulting gamification state.

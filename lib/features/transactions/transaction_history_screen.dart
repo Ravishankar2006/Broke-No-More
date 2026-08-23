@@ -205,14 +205,24 @@ class _TransactionHistoryScreenState
     );
     if (confirmed != true || !mounted) return;
 
-    await ref
-        .read(xpEngineOrchestratorProvider)
-        .deleteTransaction(transaction.id);
-    if (!mounted) return;
-    HapticFeedback.mediumImpact();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Transaction deleted')),
-    );
+    try {
+      await ref
+          .read(xpEngineOrchestratorProvider)
+          .deleteTransaction(transaction.id);
+      if (!mounted) return;
+      HapticFeedback.mediumImpact();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Transaction deleted')),
+      );
+    } catch (_) {
+      // The orchestrator throws on a re-entrant mutation or a disk error —
+      // without this the row visually reappeared (the Dismissible always
+      // springs back, see `confirmDismiss` below) with no explanation.
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Couldn't delete — please try again.")),
+      );
+    }
   }
 }
 

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -82,19 +84,46 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   Future<void> _submit() async {
     if (_saving) return;
+
+    // The page gate in `_next()` only fires when Continue is pressed *on*
+    // the identity page — the PageView itself is freely swipeable, so a
+    // swipe straight to the budget page bypassed it entirely and let Start
+    // create a blank-named profile. Re-check here, on the actual write path.
+    if (_nameController.text.trim().isEmpty) {
+      setState(() => _submitted = true);
+      HapticFeedback.heavyImpact();
+      unawaited(_pageController.animateToPage(
+        1,
+        duration: AppMotion.slow,
+        curve: AppMotion.standardCurve,
+      ));
+      return;
+    }
+
     setState(() {
       _submitted = true;
       _saving = true;
     });
 
     final budgetText = _budgetController.text.trim();
-    // No explicit navigation here — BrokeNoMoreApp watches profileProvider
-    // and swaps MaterialApp.home to HomeShell reactively once it's set.
-    await ref.read(profileProvider.notifier).createProfile(
-          name: _nameController.text.trim(),
-          avatarId: _selectedAvatar,
-          monthlyBudget: budgetText.isEmpty ? null : double.tryParse(budgetText),
-        );
+    try {
+      // No explicit navigation here — BrokeNoMoreApp watches profileProvider
+      // and swaps MaterialApp.home to HomeShell reactively once it's set.
+      await ref.read(profileProvider.notifier).createProfile(
+            name: _nameController.text.trim(),
+            avatarId: _selectedAvatar,
+            monthlyBudget:
+                budgetText.isEmpty ? null : double.tryParse(budgetText),
+          );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Couldn't save your profile — please try again."),
+        ),
+      );
+    }
   }
 
   @override

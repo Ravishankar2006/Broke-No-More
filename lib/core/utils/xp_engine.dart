@@ -153,6 +153,16 @@ StreakResult evaluateStreak({
   );
 }
 
+/// Prorates a monthly budget against [day]'s actual month length, not a
+/// flat /30 — that undercounts every month except June/September/
+/// November/April. The single definition both the XP engine and the Home
+/// screen call, so "on track" in the UI and "budget bonus earned" in the
+/// engine can never disagree.
+double dailyBudgetFor(double monthlyBudget, DateTime day) {
+  final daysInMonth = DateTime(day.year, day.month + 1, 0).day;
+  return monthlyBudget / daysInMonth;
+}
+
 /// Whether today's "stay under daily budget" XP bonus should be granted:
 /// only once per calendar day, and only when a budget is actually set.
 bool shouldAwardDailyBudgetBonus({
@@ -165,8 +175,7 @@ bool shouldAwardDailyBudgetBonus({
   if (lastBudgetBonusDate != null && isSameDay(lastBudgetBonusDate, today)) {
     return false;
   }
-  final dailyBudget = monthlyBudget / 30;
-  return spentToday <= dailyBudget;
+  return spentToday <= dailyBudgetFor(monthlyBudget, today);
 }
 
 /// Whether the weekly streak-freeze allowance should reset: once per 7-day

@@ -14,74 +14,14 @@ class QuestUpdateResult {
   final QuestStatus status;
 }
 
-/// Given an active [quest] and a newly-logged [transaction], returns the
-/// quest's updated progress/status. Returns null when the transaction is
-/// irrelevant to this quest (no-op).
-QuestUpdateResult? evaluateQuestAfterTransaction({
-  required Quest quest,
-  required Transaction transaction,
-  required double categorySpendSinceStart,
-  required int transactionCountSinceStart,
-  required int currentStreak,
-  required DateTime today,
-}) {
-  if (quest.status != QuestStatus.active) return null;
-
-  switch (quest.type) {
-    case QuestType.categoryAvoid:
-      if (transaction.type == TransactionType.expense &&
-          transaction.category == quest.category) {
-        return QuestUpdateResult(
-          progress: quest.currentProgress,
-          status: QuestStatus.failed,
-        );
-      }
-      final daysElapsed =
-          (daysBetween(quest.startDate, today) + 1).clamp(0, quest.targetValue);
-      final status = daysElapsed >= quest.targetValue
-          ? QuestStatus.completed
-          : QuestStatus.active;
-      return QuestUpdateResult(progress: daysElapsed, status: status);
-
-    case QuestType.budgetLimit:
-      if (transaction.type != TransactionType.expense ||
-          transaction.category != quest.category) {
-        return null;
-      }
-      final status = categorySpendSinceStart > quest.targetValue
-          ? QuestStatus.failed
-          : QuestStatus.active;
-      return QuestUpdateResult(
-        progress: categorySpendSinceStart.ceil(),
-        status: status,
-      );
-
-    case QuestType.count:
-      final status = transactionCountSinceStart >= quest.targetValue
-          ? QuestStatus.completed
-          : QuestStatus.active;
-      return QuestUpdateResult(
-        progress: transactionCountSinceStart,
-        status: status,
-      );
-
-    case QuestType.streak:
-      final progress = currentStreak.clamp(0, quest.targetValue);
-      final status = currentStreak >= quest.targetValue
-          ? QuestStatus.completed
-          : QuestStatus.active;
-      return QuestUpdateResult(progress: progress, status: status);
-  }
-}
-
 /// Re-derives a quest's progress and status from the whole transaction list,
-/// rather than advancing it by one transaction.
+/// rather than advancing it incrementally by one transaction.
 ///
-/// [evaluateQuestAfterTransaction] above is incremental and one-way: it can move
-/// a quest to `failed` but never back, so a `categoryAvoid` quest stayed failed
-/// forever even after the offending transaction was deleted or recategorised.
-/// Once transactions became editable that turned into a visible lie, so
-/// mutations go through this instead.
+/// A one-way incremental evaluator (advance-by-one-transaction, moving a
+/// quest to `failed` but never back) would leave a `categoryAvoid` quest
+/// failed forever even after the offending transaction was deleted or
+/// recategorised. Once transactions became editable that would be a visible
+/// lie, so every mutation replays from scratch instead.
 ///
 /// Terminal states are respected, not recomputed:
 /// - `expired` is time-driven (set at startup by `expireOverdueQuests`), so it
@@ -143,8 +83,9 @@ QuestUpdateResult replayQuest({
           .fold<double>(0, (sum, t) => sum + t.amount);
       return QuestUpdateResult(
         progress: spend.ceil(),
-        // No completed state: staying under the limit is only proven once the
-        // quest expires, matching the incremental path.
+        // No completed state here: staying under the limit is only proven
+        // once the quest's window fully elapses, which
+        // QuestRepository.expireOverdueQuests resolves, not this replay.
         status: spend > quest.targetValue
             ? QuestStatus.failed
             : QuestStatus.active,

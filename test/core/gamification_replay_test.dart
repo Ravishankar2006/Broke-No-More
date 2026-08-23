@@ -215,7 +215,7 @@ void main() {
 
   group('daily budget bonus', () {
     test('awards once per day when under the daily allowance', () {
-      // monthlyBudget / 30 = 100/day.
+      // 3000 prorated over January's 31 days ≈ 96.8/day.
       final result = replay(
         [tx(onDay: 0, amount: 50), tx(onDay: 1, amount: 50)],
         monthlyBudget: 3000,

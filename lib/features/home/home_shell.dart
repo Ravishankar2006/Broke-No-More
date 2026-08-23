@@ -12,6 +12,7 @@ import '../../providers/xp_engine_provider.dart';
 import '../../shared_widgets/badge_unlock_dialog.dart';
 import '../../shared_widgets/celebration_effects.dart';
 import '../../shared_widgets/level_up_dialog.dart';
+import '../../shared_widgets/quest_complete_dialog.dart';
 import '../insights/insights_screen.dart';
 import '../log_transaction/log_transaction_sheet.dart';
 import '../profile/profile_screen.dart';
@@ -70,6 +71,13 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     // trigger a level-up produced no feedback at all — the sheet just closed.
     if (result.xpGained > 0) showXpGain(context, result.xpGained);
 
+    // completedQuests was computed by the orchestrator but never surfaced —
+    // a quest could fill its bar to 100% with no acknowledgement at all.
+    if (result.completedQuests.isNotEmpty) {
+      await showQuestCompleteDialog(context, result.completedQuests);
+    }
+
+    if (!mounted) return;
     if (result.leveledUpTo != null) {
       await showLevelUpDialog(context, result.leveledUpTo!);
     }
@@ -161,16 +169,19 @@ class _LogFabState extends State<_LogFab> {
       scale: _pressed ? 0.9 : 1,
       duration: AppMotion.quick,
       curve: AppMotion.emphasized,
-      child: FloatingActionButton(
-        onPressed: () {
-          HapticFeedback.mediumImpact();
-          widget.onPressed();
-        },
-        tooltip: 'Log a transaction',
-        child: Listener(
-          onPointerDown: (_) => setState(() => _pressed = true),
-          onPointerUp: (_) => setState(() => _pressed = false),
-          onPointerCancel: (_) => setState(() => _pressed = false),
+      // Wraps the whole button, not just its icon child — a Listener
+      // nested inside the FAB only sees pointer events that land on the
+      // 28px icon, so most presses on the 56px button never set _pressed.
+      child: Listener(
+        onPointerDown: (_) => setState(() => _pressed = true),
+        onPointerUp: (_) => setState(() => _pressed = false),
+        onPointerCancel: (_) => setState(() => _pressed = false),
+        child: FloatingActionButton(
+          onPressed: () {
+            HapticFeedback.mediumImpact();
+            widget.onPressed();
+          },
+          tooltip: 'Log a transaction',
           child: const Icon(Icons.add_rounded, size: 28),
         ),
       ),

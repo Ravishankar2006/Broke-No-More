@@ -34,21 +34,21 @@ class QuestRepository {
     return quest;
   }
 
-  Future<void> updateProgress(Quest quest, int newProgress) async {
-    quest.currentProgress = newProgress;
-    if (newProgress >= quest.targetValue) {
-      quest.status = QuestStatus.completed;
-    }
-    await quest.save();
-  }
-
+  /// The one checkpoint (run at app startup, no backend to run this on a
+  /// schedule) for both expiring stale quests and resolving `budgetLimit`
+  /// quests, whose success can only be proven once their window has fully
+  /// elapsed — the incremental replay deliberately never marks one
+  /// `completed` while still active, so a `budgetLimit` quest that survives
+  /// to its deadline without failing succeeded, and belongs here rather
+  /// than lumped in with `expired`.
   Future<void> expireOverdueQuests({DateTime? now}) async {
     final today = now ?? DateTime.now();
     for (final quest in active) {
-      if (quest.endDate.isBefore(today)) {
-        quest.status = QuestStatus.expired;
-        await quest.save();
-      }
+      if (!quest.endDate.isBefore(today)) continue;
+      quest.status = quest.type == QuestType.budgetLimit
+          ? QuestStatus.completed
+          : QuestStatus.expired;
+      await quest.save();
     }
   }
 

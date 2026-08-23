@@ -1,20 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hive/hive.dart';
 
-/// Simple in-memory theme toggle for the Profile screen (PRD section 4).
+import '../core/database/hive_boxes.dart';
+
+const String _kThemeModeKey = 'theme_mode';
+
+/// Persists the user's theme choice to the untyped `app_state` box (PRD
+/// section 4) — same pattern as [SkippedQuestRepository]. Previously this
+/// held state in memory only, so every cold start reverted to `system`
+/// regardless of what the user had chosen.
 class ThemeModeNotifier extends Notifier<ThemeMode> {
-  @override
-  ThemeMode build() => ThemeMode.system;
+  Box<dynamic> get _box => Hive.box<dynamic>(HiveBoxes.appState);
 
-  void toggle() {
-    state = state == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
+  @override
+  ThemeMode build() {
+    final stored = _box.get(_kThemeModeKey);
+    return ThemeMode.values.firstWhere(
+      (mode) => mode.name == stored,
+      orElse: () => ThemeMode.system,
+    );
   }
 
-  /// Explicit set, for a switch whose position must match the resulting state.
-  /// `toggle` flips relative to the current value, which desyncs a Switch when
-  /// the mode is still `system`.
-  void setDark(bool dark) {
-    state = dark ? ThemeMode.dark : ThemeMode.light;
+  Future<void> setMode(ThemeMode mode) async {
+    state = mode;
+    await _box.put(_kThemeModeKey, mode.name);
   }
 }
 

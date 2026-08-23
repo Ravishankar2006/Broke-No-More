@@ -13,13 +13,13 @@ class TransactionRepository {
 
   List<Transaction> getAll() => _box.values.toList(growable: false);
 
-  Transaction add({
+  Future<Transaction> add({
     required double amount,
     required TransactionType type,
     required String category,
     String? note,
     required DateTime timestamp,
-  }) {
+  }) async {
     final now = DateTime.now();
     final transaction = Transaction(
       id: _uuid.v4(),
@@ -31,7 +31,7 @@ class TransactionRepository {
       loggedAt: now,
       isQuickLog: isWithinMinutesOf(timestamp, now, kQuickLogWindowMinutes),
     );
-    _box.put(transaction.id, transaction);
+    await _box.put(transaction.id, transaction);
     return transaction;
   }
 
