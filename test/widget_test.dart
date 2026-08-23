@@ -89,9 +89,15 @@ void main() {
         await Future<void>.delayed(const Duration(milliseconds: 300));
       });
       await tester.pump();
-      await tester.pump();
+      // Home staggers its card entrance with flutter_animate, which implements
+      // per-item delay as a Timer. Pump past the longest stagger so none are
+      // left pending when the test ends.
+      await tester.pump(const Duration(milliseconds: 600));
 
-      expect(find.text('Hey, Riya'), findsOneWidget);
+      // The home header now shows a time-of-day greeting above the name
+      // rather than a single "Hey, {name}" string. Assert on the name, which
+      // is the part that doesn't depend on when the suite runs.
+      expect(find.text('Riya'), findsOneWidget);
     },
     timeout: const Timeout(Duration(seconds: 30)),
   );
