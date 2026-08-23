@@ -25,13 +25,14 @@ class TransactionAdapter extends TypeAdapter<Transaction> {
       timestamp: fields[5] as DateTime,
       loggedAt: fields[6] as DateTime,
       isQuickLog: fields[7] as bool,
+      xpAwarded: fields[8] as int?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Transaction obj) {
     writer
-      ..writeByte(8)
+      ..writeByte(9)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -47,7 +48,9 @@ class TransactionAdapter extends TypeAdapter<Transaction> {
       ..writeByte(6)
       ..write(obj.loggedAt)
       ..writeByte(7)
-      ..write(obj.isQuickLog);
+      ..write(obj.isQuickLog)
+      ..writeByte(8)
+      ..write(obj.xpAwarded);
   }
 
   @override

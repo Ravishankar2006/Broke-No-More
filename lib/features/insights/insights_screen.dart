@@ -3,11 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_dimens.dart';
+import '../../core/theme/app_motion.dart';
 import '../../core/theme/app_semantic_colors.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/date_helpers.dart';
 import '../../models/transaction.dart';
 import '../../providers/transaction_provider.dart';
+import '../../shared_widgets/app_card.dart';
+import '../../shared_widgets/empty_state.dart';
+import '../../shared_widgets/section_header.dart';
 
 /// Stable hash for category-to-colour assignment. Hand-rolled djb2 (not String.hashCode,
 /// which Dart does not guarantee stable across runs/platforms).
@@ -41,297 +45,538 @@ Map<String, Color> _assignCategoryColors(
 Color _onSlice(Color bg) =>
     bg.computeLuminance() > 0.45 ? const Color(0xFF1A1200) : Colors.white;
 
-class InsightsScreen extends ConsumerWidget {
+/// Selectable time window. "7 days" used to be hardcoded in three places with
+/// no way to look at anything else.
+enum InsightsRange {
+  week('Week', 7),
+  month('Month', 30),
+  all('All', null);
+
+  const InsightsRange(this.label, this.days);
+
+  final String label;
+
+  /// null means "everything since the first transaction".
+  final int? days;
+}
+
+/// A bounded time window plus the expenses inside it.
+class _Window {
+  const _Window({
+    required this.start,
+    required this.end,
+    required this.expenses,
+  });
+
+  final DateTime start;
+  final DateTime end;
+  final List<Transaction> expenses;
+
+  double get total => expenses.fold<double>(0, (sum, t) => sum + t.amount);
+
+  int get dayCount => daysBetween(start, end) + 1;
+}
+
+class InsightsScreen extends ConsumerStatefulWidget {
   const InsightsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<InsightsScreen> createState() => _InsightsScreenState();
+}
+
+class _InsightsScreenState extends ConsumerState<InsightsScreen> {
+  InsightsRange _range = InsightsRange.week;
+
+  @override
+  Widget build(BuildContext context) {
     final semantics = context.semantics;
     final transactions = ref.watch(transactionsProvider);
     final expenses =
         transactions.where((t) => t.type == TransactionType.expense).toList();
 
     final now = DateTime.now();
-    final thisWeek = _sumInWindow(expenses, now, 7);
-    final lastWeek = _sumInWindow(expenses, now.subtract(const Duration(days: 7)), 7);
-    final byCategory = _totalsByCategory(expenses, now, 7);
-    final dailyTotals = _dailyTotals(expenses, now, 7);
-    final categoryColors = _assignCategoryColors(byCategory.keys, semantics.chartPalette);
+    final current = _windowFor(expenses, now, _range);
+    final previous = _previousWindow(expenses, now, _range, current);
+
+    final byCategory = _totalsByCategory(current);
+    final categoryColors =
+        _assignCategoryColors(byCategory.keys, semantics.chartPalette);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Insights')),
-      body: expenses.isEmpty
-          ? Center(
-              child: Text(
-                'Log a few transactions to see spending insights here.',
-                style: Theme.of(context).textTheme.bodyMedium,
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            pinned: true,
+            title: const Text('Insights'),
+            titleSpacing: Spacing.lg,
+          ),
+          if (expenses.isEmpty)
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: EmptyState(
+                icon: Icons.insights_rounded,
+                title: 'No spending yet',
+                message:
+                    'Log a few expenses and this fills up with category '
+                    'breakdowns and week-over-week trends.',
               ),
             )
-          : ListView(
-              padding: EdgeInsets.all(Spacing.lg),
-              children: [
-                Card(
-                  child: Padding(
-                    padding: EdgeInsets.all(Spacing.lg),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Week over week',
-                            style: Theme.of(context).textTheme.titleMedium),
-                        SizedBox(height: Spacing.md),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _WeekStat(
-                                label: 'This week',
-                                amount: thisWeek,
-                                isPrevious: false,
-                              ),
-                            ),
-                            Expanded(
-                              child: _WeekStat(
-                                label: 'Last week',
-                                amount: lastWeek,
-                                isPrevious: true,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
+          else
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(
+                Spacing.lg,
+                Spacing.md,
+                Spacing.lg,
+                Spacing.xxxl,
+              ),
+              sliver: SliverList.list(
+                children: [
+                  _RangeSelector(
+                    range: _range,
+                    onChanged: (range) => setState(() => _range = range),
                   ),
-                ),
-                SizedBox(height: Spacing.md),
-                Card(
-                  child: Padding(
-                    padding: EdgeInsets.all(Spacing.lg),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('By category (7 days)',
-                            style: Theme.of(context).textTheme.titleMedium),
-                        SizedBox(height: Spacing.lg),
-                        SizedBox(
-                          height: 200,
-                          child: byCategory.isEmpty
-                              ? const SizedBox.shrink()
-                              : Column(
-                                  children: [
-                                    Expanded(
-                                      child: PieChart(
-                                        PieChartData(
-                                          sectionsSpace: 2,
-                                          centerSpaceRadius: 48,
-                                          sections: [
-                                            for (final entry in byCategory.entries
-                                                .toList()
-                                              ..sort((a, b) =>
-                                                  b.value.compareTo(a.value)))
-                                              PieChartSectionData(
-                                                value: entry.value,
-                                                title:
-                                                    '${(entry.value / thisWeek * 100).round()}%',
-                                                color: categoryColors[entry.key]!,
-                                                radius: 60,
-                                                titleStyle: TextStyle(
-                                                  fontSize: 11,
-                                                  color: _onSlice(
-                                                      categoryColors[entry.key]!),
-                                                  fontWeight: FontWeight.w600,
-                                                ),
-                                                borderSide: BorderSide(
-                                                  color: Theme.of(context)
-                                                      .colorScheme
-                                                      .surface,
-                                                  width: 2,
-                                                ),
-                                              ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                    SizedBox(height: Spacing.lg),
-                                    Wrap(
-                                      spacing: Spacing.md,
-                                      runSpacing: Spacing.sm,
-                                      children: [
-                                        for (final entry
-                                            in byCategory.entries.toList()
-                                              ..sort((a, b) =>
-                                                  b.value.compareTo(a.value)))
-                                          Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Container(
-                                                width: 10,
-                                                height: 10,
-                                                decoration: BoxDecoration(
-                                                  color: categoryColors[entry.key],
-                                                  borderRadius:
-                                                      BorderRadius.circular(2),
-                                                ),
-                                              ),
-                                              SizedBox(width: Spacing.sm),
-                                              Text(
-                                                entry.key,
-                                                style: Theme.of(context)
-                                                    .textTheme
-                                                    .labelSmall,
-                                              ),
-                                            ],
-                                          ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                        ),
-                      ],
-                    ),
+                  SizedBox(height: Spacing.lg),
+                  _SummaryHero(current: current, previous: previous),
+                  SizedBox(height: Spacing.xl),
+                  SectionHeader(title: 'By category'),
+                  _CategoryBreakdown(
+                    byCategory: byCategory,
+                    total: current.total,
+                    colors: categoryColors,
                   ),
-                ),
-                SizedBox(height: Spacing.md),
-                Card(
-                  child: Padding(
-                    padding: EdgeInsets.all(Spacing.lg),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Spending trend (7 days)',
-                            style: Theme.of(context).textTheme.titleMedium),
-                        SizedBox(height: Spacing.lg),
-                        SizedBox(
-                          height: 160,
-                          child: BarChart(
-                            BarChartData(
-                              titlesData: FlTitlesData(
-                                topTitles: const AxisTitles(
-                                    sideTitles: SideTitles(showTitles: false)),
-                                rightTitles: const AxisTitles(
-                                    sideTitles: SideTitles(showTitles: false)),
-                                leftTitles: const AxisTitles(
-                                    sideTitles: SideTitles(showTitles: false)),
-                                bottomTitles: AxisTitles(
-                                  sideTitles: SideTitles(
-                                    showTitles: true,
-                                    getTitlesWidget: (value, meta) {
-                                      final i = value.toInt();
-                                      if (i < 0 || i >= dailyTotals.length) {
-                                        return const SizedBox.shrink();
-                                      }
-                                      return Padding(
-                                        padding: EdgeInsets.only(top: Spacing.xs),
-                                        child: Text(
-                                          dailyTotals[i].$1,
-                                          style: Theme.of(context).textTheme.labelSmall,
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ),
-                              ),
-                              borderData: FlBorderData(show: false),
-                              gridData: FlGridData(
-                                show: true,
-                                drawVerticalLine: false,
-                                getDrawingHorizontalLine: (_) => FlLine(
-                                  color: semantics.chartGrid,
-                                  strokeWidth: 1,
-                                ),
-                              ),
-                              barGroups: [
-                                for (final entry in dailyTotals.asMap().entries)
-                                  BarChartGroupData(
-                                    x: entry.key,
-                                    barRods: [
-                                      BarChartRodData(
-                                        toY: entry.value.$2,
-                                        color: semantics.chartBar,
-                                        width: 16,
-                                        borderRadius: BorderRadius.vertical(
-                                          top: Radius.circular(AppRadius.xs),
-                                        ),
-                                        backDrawRodData: BackgroundBarChartRodData(
-                                          show: true,
-                                          toY: dailyTotals
-                                              .fold<double>(
-                                                  0,
-                                                  (max, val) =>
-                                                      val.$2 > max ? val.$2 : max)
-                                              .ceil()
-                                              .toDouble(),
-                                          color: semantics.barTrack,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
+                  SizedBox(height: Spacing.xl),
+                  SectionHeader(title: 'Daily trend'),
+                  _TrendChart(window: current, range: _range),
+                ],
+              ),
             ),
+        ],
+      ),
     );
   }
 
-  double _sumInWindow(List<Transaction> expenses, DateTime end, int days) {
-    final start = startOfDay(end).subtract(Duration(days: days - 1));
-    return expenses
-        .where((t) => !startOfDay(t.timestamp).isBefore(start) &&
-            !startOfDay(t.timestamp).isAfter(startOfDay(end)))
-        .fold(0.0, (sum, t) => sum + t.amount);
+  /// Builds the current window. Both ends are bounded — the previous version
+  /// bounded the week total but not the per-category totals, so a transaction
+  /// dated in the future inflated a category past the denominator and rendered
+  /// as ">100%", "NaN%" or "Infinity%".
+  static _Window _windowFor(
+    List<Transaction> expenses,
+    DateTime now,
+    InsightsRange range,
+  ) {
+    final end = startOfDay(now);
+    final DateTime start;
+    if (range.days != null) {
+      start = end.subtract(Duration(days: range.days! - 1));
+    } else if (expenses.isEmpty) {
+      start = end;
+    } else {
+      start = expenses
+          .map((t) => startOfDay(t.timestamp))
+          .reduce((a, b) => a.isBefore(b) ? a : b);
+    }
+    return _Window(start: start, end: end, expenses: _within(expenses, start, end));
   }
 
-  Map<String, double> _totalsByCategory(
-      List<Transaction> expenses, DateTime end, int days) {
-    final start = startOfDay(end).subtract(Duration(days: days - 1));
+  static _Window _previousWindow(
+    List<Transaction> expenses,
+    DateTime now,
+    InsightsRange range,
+    _Window current,
+  ) {
+    // "All" has no meaningful previous period.
+    if (range.days == null) {
+      return _Window(start: current.start, end: current.start, expenses: const []);
+    }
+    final end = current.start.subtract(const Duration(days: 1));
+    final start = end.subtract(Duration(days: range.days! - 1));
+    return _Window(start: start, end: end, expenses: _within(expenses, start, end));
+  }
+
+  static List<Transaction> _within(
+    List<Transaction> expenses,
+    DateTime start,
+    DateTime end,
+  ) {
+    return expenses.where((t) {
+      final day = startOfDay(t.timestamp);
+      return !day.isBefore(start) && !day.isAfter(end);
+    }).toList(growable: false);
+  }
+
+  static Map<String, double> _totalsByCategory(_Window window) {
     final totals = <String, double>{};
-    for (final t in expenses) {
-      if (startOfDay(t.timestamp).isBefore(start)) continue;
+    for (final t in window.expenses) {
       totals[t.category] = (totals[t.category] ?? 0) + t.amount;
     }
     return totals;
   }
-
-  List<(String, double)> _dailyTotals(
-      List<Transaction> expenses, DateTime end, int days) {
-    const labels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-    return List.generate(days, (i) {
-      final day = startOfDay(end).subtract(Duration(days: days - 1 - i));
-      final total = expenses
-          .where((t) => isSameDay(t.timestamp, day))
-          .fold(0.0, (sum, t) => sum + t.amount);
-      return (labels[day.weekday - 1], total);
-    });
-  }
 }
 
-class _WeekStat extends StatelessWidget {
-  const _WeekStat({
-    required this.label,
-    required this.amount,
-    required this.isPrevious,
-  });
+class _RangeSelector extends StatelessWidget {
+  const _RangeSelector({required this.range, required this.onChanged});
 
-  final String label;
-  final double amount;
-  final bool isPrevious;
+  final InsightsRange range;
+  final ValueChanged<InsightsRange> onChanged;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: Theme.of(context).textTheme.bodySmall),
-        SizedBox(height: Spacing.xs),
-        Text(
-          formatCurrency(amount),
-          style: Theme.of(context).textTheme.titleLarge,
-        ),
+    return SegmentedButton<InsightsRange>(
+      segments: [
+        for (final option in InsightsRange.values)
+          ButtonSegment(value: option, label: Text(option.label)),
       ],
+      selected: {range},
+      showSelectedIcon: false,
+      onSelectionChanged: (selection) => onChanged(selection.first),
     );
+  }
+}
+
+/// Total spent plus the change against the previous period — the headline
+/// number the screen never had.
+class _SummaryHero extends StatelessWidget {
+  const _SummaryHero({required this.current, required this.previous});
+
+  final _Window current;
+  final _Window previous;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final semantics = context.semantics;
+
+    final total = current.total;
+    final prior = previous.total;
+    final hasComparison = prior > 0;
+    final delta = hasComparison ? (total - prior) / prior * 100 : 0.0;
+    final spentMore = delta > 0;
+    final perDay = current.dayCount == 0 ? 0.0 : total / current.dayCount;
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Total spent', style: theme.textTheme.labelMedium),
+          SizedBox(height: Spacing.xs),
+          Text(
+            formatCurrency(total),
+            style: theme.textTheme.headlineMedium?.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          SizedBox(height: Spacing.md),
+          Row(
+            children: [
+              // Flexible, not fixed: this sentence is long and the row also
+              // carries the per-day figure, so on a narrow screen it has to be
+              // allowed to shrink rather than overflow.
+              Expanded(
+                child: hasComparison
+                    ? Row(
+                        children: [
+                          Icon(
+                            spentMore
+                                ? Icons.trending_up
+                                : Icons.trending_down,
+                            size: 18,
+                            // Spending less is the good outcome, so down is
+                            // green.
+                            color: spentMore
+                                ? semantics.expenseInk
+                                : semantics.incomeInk,
+                          ),
+                          SizedBox(width: Spacing.xs),
+                          Expanded(
+                            child: Text(
+                              '${delta.abs().toStringAsFixed(0)}% '
+                              '${spentMore ? 'more' : 'less'} than last period',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: spentMore
+                                    ? semantics.expenseInk
+                                    : semantics.incomeInk,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                    : Text(
+                        'No previous period to compare',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall,
+                      ),
+              ),
+              SizedBox(width: Spacing.sm),
+              Text(
+                '${formatCurrency(perDay)}/day',
+                style: theme.textTheme.bodySmall,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CategoryBreakdown extends StatefulWidget {
+  const _CategoryBreakdown({
+    required this.byCategory,
+    required this.total,
+    required this.colors,
+  });
+
+  final Map<String, double> byCategory;
+  final double total;
+  final Map<String, Color> colors;
+
+  @override
+  State<_CategoryBreakdown> createState() => _CategoryBreakdownState();
+}
+
+class _CategoryBreakdownState extends State<_CategoryBreakdown> {
+  int _touchedIndex = -1;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    if (widget.byCategory.isEmpty) {
+      // Previously this left a 200px hole under a visible header.
+      return AppCard(
+        child: EmptyState(
+          compact: true,
+          icon: Icons.pie_chart_outline,
+          title: 'Nothing in this period',
+          message: 'Pick a wider range, or log an expense.',
+        ),
+      );
+    }
+
+    final entries = widget.byCategory.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    return AppCard(
+      child: Column(
+        children: [
+          SizedBox(
+            height: 210,
+            child: PieChart(
+              PieChartData(
+                sectionsSpace: 2,
+                centerSpaceRadius: 52,
+                pieTouchData: PieTouchData(
+                  touchCallback: (event, response) {
+                    setState(() {
+                      _touchedIndex = event.isInterestedForInteractions &&
+                              response?.touchedSection != null
+                          ? response!.touchedSection!.touchedSectionIndex
+                          : -1;
+                    });
+                  },
+                ),
+                sections: [
+                  for (var i = 0; i < entries.length; i++)
+                    _section(entries[i], i == _touchedIndex),
+                ],
+              ),
+              duration: AppMotion.standard,
+              curve: AppMotion.standardCurve,
+            ),
+          ),
+          SizedBox(height: Spacing.lg),
+          // Amounts, not just percentages — the legend used to show names only.
+          for (final entry in entries)
+            Padding(
+              padding: EdgeInsets.only(bottom: Spacing.sm),
+              child: Row(
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: widget.colors[entry.key],
+                      borderRadius: BorderRadius.circular(AppRadius.xs / 2),
+                    ),
+                  ),
+                  SizedBox(width: Spacing.md),
+                  Expanded(
+                    child: Text(
+                      entry.key,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                  ),
+                  Text(
+                    formatCurrency(entry.value),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  SizedBox(width: Spacing.sm),
+                  SizedBox(
+                    width: 44,
+                    child: Text(
+                      '${_percent(entry.value)}%',
+                      textAlign: TextAlign.right,
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  PieChartSectionData _section(MapEntry<String, double> entry, bool touched) {
+    final color = widget.colors[entry.key]!;
+    return PieChartSectionData(
+      value: entry.value,
+      title: '${_percent(entry.value)}%',
+      color: color,
+      radius: touched ? 70 : 60,
+      titleStyle: TextStyle(
+        fontSize: touched ? 13 : 11,
+        color: _onSlice(color),
+        fontWeight: FontWeight.w700,
+      ),
+      borderSide: BorderSide(
+        color: Theme.of(context).colorScheme.surface,
+        width: 2,
+      ),
+    );
+  }
+
+  /// Guarded against a zero total. The old call divided by a differently-bounded
+  /// window sum and could produce NaN or Infinity.
+  int _percent(double value) {
+    if (widget.total <= 0) return 0;
+    return (value / widget.total * 100).round();
+  }
+}
+
+class _TrendChart extends StatelessWidget {
+  const _TrendChart({required this.window, required this.range});
+
+  final _Window window;
+  final InsightsRange range;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final semantics = context.semantics;
+    final daily = _dailyTotals();
+    final maxValue = daily.fold<double>(0, (m, d) => d.value > m ? d.value : m);
+
+    return AppCard(
+      child: SizedBox(
+        height: 180,
+        child: BarChart(
+          BarChartData(
+            alignment: BarChartAlignment.spaceAround,
+            maxY: maxValue <= 0 ? 1 : maxValue * 1.15,
+            titlesData: _titles(context, daily),
+            borderData: FlBorderData(show: false),
+            gridData: FlGridData(
+              show: true,
+              drawVerticalLine: false,
+              getDrawingHorizontalLine: (_) =>
+                  FlLine(color: semantics.chartGrid, strokeWidth: 1),
+            ),
+            barTouchData: BarTouchData(
+              touchTooltipData: BarTouchTooltipData(
+                getTooltipColor: (_) => theme.colorScheme.inverseSurface,
+                getTooltipItem: (group, _, rod, _) => BarTooltipItem(
+                  formatCurrency(rod.toY),
+                  theme.textTheme.labelSmall!.copyWith(
+                    color: theme.colorScheme.onInverseSurface,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+            barGroups: [
+              for (var i = 0; i < daily.length; i++)
+                BarChartGroupData(
+                  x: i,
+                  barRods: [
+                    BarChartRodData(
+                      toY: daily[i].value,
+                      color: semantics.chartBar,
+                      width: daily.length > 14 ? 6 : 16,
+                      borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(AppRadius.xs),
+                      ),
+                      backDrawRodData: BackgroundBarChartRodData(
+                        show: true,
+                        toY: maxValue <= 0 ? 1 : maxValue * 1.15,
+                        color: semantics.barTrack,
+                      ),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+          duration: AppMotion.standard,
+          curve: AppMotion.standardCurve,
+        ),
+      ),
+    );
+  }
+
+  FlTitlesData _titles(
+    BuildContext context,
+    List<({String label, double value})> daily,
+  ) {
+    const hidden = AxisTitles(sideTitles: SideTitles(showTitles: false));
+    // With many bars, labelling every one is unreadable — thin them out.
+    final step = (daily.length / 7).ceil();
+
+    return FlTitlesData(
+      topTitles: hidden,
+      rightTitles: hidden,
+      leftTitles: hidden,
+      bottomTitles: AxisTitles(
+        sideTitles: SideTitles(
+          showTitles: true,
+          getTitlesWidget: (value, meta) {
+            final i = value.toInt();
+            if (i < 0 || i >= daily.length) return const SizedBox.shrink();
+            if (step > 1 && i % step != 0) return const SizedBox.shrink();
+            return Padding(
+              padding: EdgeInsets.only(top: Spacing.xs),
+              child: Text(
+                daily[i].label,
+                style: Theme.of(context).textTheme.labelSmall,
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  List<({String label, double value})> _dailyTotals() {
+    // Two-letter weekdays for a week view; day-of-month for longer ranges,
+    // where repeating weekday letters would be meaningless.
+    const weekdays = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+    final days = window.dayCount;
+
+    return List.generate(days, (i) {
+      final day = window.start.add(Duration(days: i));
+      final total = window.expenses
+          .where((t) => isSameDay(t.timestamp, day))
+          .fold<double>(0, (sum, t) => sum + t.amount);
+      final label =
+          days <= 7 ? weekdays[day.weekday - 1] : '${day.day}';
+      return (label: label, value: total);
+    });
   }
 }

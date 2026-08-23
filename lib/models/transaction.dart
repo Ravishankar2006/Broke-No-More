@@ -21,6 +21,7 @@ class Transaction extends HiveObject {
     required this.timestamp,
     required this.loggedAt,
     required this.isQuickLog,
+    this.xpAwarded,
   });
 
   @HiveField(0)
@@ -46,4 +47,20 @@ class Transaction extends HiveObject {
 
   @HiveField(7)
   bool isQuickLog;
+
+  /// XP this transaction earned, as of the last gamification replay.
+  ///
+  /// Nullable so Hive records written before this field existed deserialize as
+  /// null rather than throwing — same migration pattern as
+  /// [UserProfile.remindersEnabled].
+  ///
+  /// This is a *cache* of what [replayGamification] computed, not an
+  /// independent source of truth: the replay recomputes it from scratch on every
+  /// mutation and writes back only the rows whose value actually changed. It
+  /// exists so the history screen can show "+10 XP" per row without re-running
+  /// the engine, and so there's an audit trail if XP is ever disputed.
+  ///
+  /// null means "never replayed" — render it as no XP chip, not as zero.
+  @HiveField(8)
+  int? xpAwarded;
 }
