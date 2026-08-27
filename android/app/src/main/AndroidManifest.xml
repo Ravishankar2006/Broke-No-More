@@ -3,7 +3,7 @@
          Profile — see StreakReminderService. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
-        android:label="broke_no_more"
+        android:label="Broke No More"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
