@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:lottie/lottie.dart';
 
@@ -31,13 +32,17 @@ class CelebrationBurst extends StatefulWidget {
 
 class _CelebrationBurstState extends State<CelebrationBurst> {
   late final ConfettiController _controller = ConfettiController(
-    duration: const Duration(milliseconds: 700),
+    duration: AppMotion.confetti,
   );
 
   @override
-  void initState() {
-    super.initState();
-    _controller.play();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Deferred from initState: needs an inherited MediaQuery, which isn't
+    // available yet at construction time.
+    if (!MediaQuery.disableAnimationsOf(context)) {
+      _controller.play();
+    }
     // The burst is silent otherwise; a reward the user can feel lands harder.
     HapticFeedback.mediumImpact();
   }
@@ -50,6 +55,10 @@ class _CelebrationBurstState extends State<CelebrationBurst> {
 
   @override
   Widget build(BuildContext context) {
+    // "Remove animations" is an explicit accessibility opt-out — respecting
+    // it means suppressing the confetti burst entirely, not just shortening it.
+    if (MediaQuery.disableAnimationsOf(context)) return widget.child;
+
     final confettiColors = [
       Theme.of(context).colorScheme.primary,
       context.semantics.xp,
@@ -95,9 +104,11 @@ class BounceIn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (MediaQuery.disableAnimationsOf(context)) return child;
+
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0.0, end: 1.0),
-      duration: const Duration(milliseconds: 550),
+      duration: AppMotion.bounce,
       curve: AppMotion.spring,
       // TweenAnimationBuilder has no delay, so hold at scale 0 until the
       // stagger has elapsed.
@@ -197,6 +208,12 @@ class CelebrationAnimation extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final semantics = context.semantics;
+    // A looping Lottie (the Home streak flame) is exactly the kind of
+    // perpetual motion "remove animations" is meant to suppress; freeze on
+    // the fallback icon instead of playing even a single pass.
+    if (repeat && MediaQuery.disableAnimationsOf(context)) {
+      return Icon(fallbackIcon, size: size * 0.6, color: semantics.xp);
+    }
     return SizedBox(
       width: size,
       height: size,
@@ -204,11 +221,8 @@ class CelebrationAnimation extends StatelessWidget {
         asset,
         repeat: repeat,
         fit: BoxFit.contain,
-        errorBuilder: (context, _, _) => Icon(
-          fallbackIcon,
-          size: size * 0.6,
-          color: semantics.xp,
-        ),
+        errorBuilder: (context, _, _) =>
+            Icon(fallbackIcon, size: size * 0.6, color: semantics.xp),
       ),
     );
   }
@@ -229,6 +243,14 @@ void showXpGain(BuildContext context, int xp) {
   if (overlay == null) return;
 
   HapticFeedback.lightImpact();
+  // The chip itself sits inside an IgnorePointer/opacity-animated overlay
+  // that a screen reader has no reason to visit, so without this a TalkBack
+  // user gets no signal at all that logging just earned XP.
+  SemanticsService.sendAnnouncement(
+    View.of(context),
+    '+$xp XP earned',
+    TextDirection.ltr,
+  );
 
   late final OverlayEntry entry;
   entry = OverlayEntry(
@@ -256,7 +278,7 @@ class _XpGainChipState extends State<_XpGainChip>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 1800),
+    duration: AppMotion.xpChipLifetime,
   );
 
   @override
@@ -290,20 +312,17 @@ class _XpGainChipState extends State<_XpGainChip>
             final opacity = t < 0.2
                 ? (t / 0.2)
                 : t > 0.75
-                    ? (1 - (t - 0.75) / 0.25)
-                    : 1.0;
+                ? (1 - (t - 0.75) / 0.25)
+                : 1.0;
             final rise = t < 0.2 ? (1 - t / 0.2) * 16 : -8 * (t - 0.2);
             return Opacity(
               opacity: opacity.clamp(0.0, 1.0),
-              child: Transform.translate(
-                offset: Offset(0, rise),
-                child: child,
-              ),
+              child: Transform.translate(offset: Offset(0, rise), child: child),
             );
           },
           child: Center(
             child: Container(
-              padding: EdgeInsets.symmetric(
+              padding: const EdgeInsets.symmetric(
                 horizontal: Spacing.lg,
                 vertical: Spacing.sm,
               ),
@@ -315,8 +334,12 @@ class _XpGainChipState extends State<_XpGainChip>
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.bolt, size: 18, color: semantics.onGold),
-                  SizedBox(width: Spacing.xs),
+                  Icon(
+                    Icons.bolt,
+                    size: IconSize.smMd,
+                    color: semantics.onGold,
+                  ),
+                  const SizedBox(width: Spacing.xs),
                   Text(
                     '+${widget.xp} XP',
                     style: theme.textTheme.labelLarge?.copyWith(

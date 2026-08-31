@@ -18,5 +18,6 @@ class BadgesNotifier extends Notifier<List<Badge>> {
   }
 }
 
-final badgesProvider =
-    NotifierProvider<BadgesNotifier, List<Badge>>(BadgesNotifier.new);
+final badgesProvider = NotifierProvider<BadgesNotifier, List<Badge>>(
+  BadgesNotifier.new,
+);

@@ -18,6 +18,7 @@ class ProfileRepository {
     required String name,
     required String avatarId,
     double? monthlyBudget,
+    String? currencyCode,
   }) async {
     final profile = UserProfile(
       id: kLocalProfileKey,
@@ -25,6 +26,7 @@ class ProfileRepository {
       avatarId: avatarId,
       joinDate: DateTime.now(),
       monthlyBudget: monthlyBudget,
+      currencyCode: currencyCode,
     );
     await _box.put(kLocalProfileKey, profile);
     return profile;
@@ -34,4 +36,9 @@ class ProfileRepository {
   /// `profile.save()` so it works for both the box-bound instance and a
   /// fresh `copyWith` value.
   Future<void> save(UserProfile profile) => _box.put(kLocalProfileKey, profile);
+
+  /// Removes the profile entirely — Settings > Reset app, and the first
+  /// step of a JSON backup restore before writing the restored one back.
+  /// Previously there was no delete path at all.
+  Future<void> delete() => _box.delete(kLocalProfileKey);
 }

@@ -28,8 +28,9 @@ abstract class AppTheme {
       useMaterial3: true,
       brightness: brightness,
       colorScheme: cs,
-      scaffoldBackgroundColor:
-          isDark ? AppPalette.canvasDark : AppPalette.canvasLight,
+      scaffoldBackgroundColor: isDark
+          ? AppPalette.canvasDark
+          : AppPalette.canvasLight,
       textTheme: text,
       extensions: [isDark ? AppSemanticColors.dark : AppSemanticColors.light],
       splashFactory: InkSparkle.splashFactory,
@@ -44,9 +45,7 @@ abstract class AppTheme {
         centerTitle: false,
         titleSpacing: Spacing.lg,
         titleTextStyle: text.titleLarge,
-        shape: Border(
-          bottom: BorderSide(color: cs.outlineVariant, width: 1),
-        ),
+        shape: Border(bottom: BorderSide(color: cs.outlineVariant, width: 1)),
         surfaceTintColor: Colors.transparent,
       ),
       bottomAppBarTheme: BottomAppBarThemeData(
@@ -55,15 +54,13 @@ abstract class AppTheme {
         shadowColor: AppPalette.indigo950.withValues(alpha: 0.10),
         surfaceTintColor: Colors.transparent,
         height: 68,
-        padding: EdgeInsets.symmetric(horizontal: Spacing.sm),
+        padding: const EdgeInsets.symmetric(horizontal: Spacing.sm),
       ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: cs.surface,
         indicatorColor: cs.secondaryContainer,
         elevation: 0,
-        labelTextStyle: WidgetStatePropertyAll(
-          text.labelSmall,
-        ),
+        labelTextStyle: WidgetStatePropertyAll(text.labelSmall),
       ),
       cardTheme: CardThemeData(
         color: cs.surface,
@@ -87,7 +84,7 @@ abstract class AppTheme {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.lg),
         ),
-        extendedPadding: EdgeInsets.symmetric(horizontal: Spacing.xl),
+        extendedPadding: const EdgeInsets.symmetric(horizontal: Spacing.xl),
       ),
       progressIndicatorTheme: ProgressIndicatorThemeData(
         color: cs.tertiary, // gold
@@ -104,7 +101,10 @@ abstract class AppTheme {
           disabledBackgroundColor: cs.tertiary.withValues(alpha: 0.35),
           disabledForegroundColor: cs.onTertiary.withValues(alpha: 0.5),
           minimumSize: const Size(0, 48),
-          padding: EdgeInsets.symmetric(horizontal: Spacing.xl, vertical: Spacing.md),
+          padding: const EdgeInsets.symmetric(
+            horizontal: Spacing.xl,
+            vertical: Spacing.md,
+          ),
           textStyle: text.labelLarge,
           elevation: 0,
           shape: RoundedRectangleBorder(
@@ -117,7 +117,7 @@ abstract class AppTheme {
           foregroundColor: cs.primary,
           minimumSize: const Size(0, 44),
           textStyle: text.labelLarge,
-          padding: EdgeInsets.symmetric(horizontal: Spacing.lg),
+          padding: const EdgeInsets.symmetric(horizontal: Spacing.lg),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.sm),
           ),
@@ -128,7 +128,7 @@ abstract class AppTheme {
           foregroundColor: cs.primary,
           minimumSize: const Size(0, 44),
           textStyle: text.labelLarge,
-          padding: EdgeInsets.symmetric(horizontal: Spacing.lg),
+          padding: const EdgeInsets.symmetric(horizontal: Spacing.lg),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.sm),
           ),
@@ -136,9 +136,7 @@ abstract class AppTheme {
         ),
       ),
       iconButtonTheme: IconButtonThemeData(
-        style: IconButton.styleFrom(
-          foregroundColor: cs.onSurfaceVariant,
-        ),
+        style: IconButton.styleFrom(foregroundColor: cs.onSurfaceVariant),
       ),
       chipTheme: ChipThemeData(
         backgroundColor: cs.surfaceContainerHigh,
@@ -147,12 +145,15 @@ abstract class AppTheme {
         showCheckmark: false,
         side: BorderSide(color: cs.outlineVariant),
         shape: const StadiumBorder(),
-        labelStyle: text.labelLarge!
-            .copyWith(color: cs.onSurface),
-        secondaryLabelStyle: text.labelLarge!
-            .copyWith(color: cs.onSecondaryContainer),
-        labelPadding: EdgeInsets.symmetric(horizontal: Spacing.xs),
-        padding: EdgeInsets.symmetric(horizontal: Spacing.md, vertical: Spacing.sm),
+        labelStyle: text.labelLarge!.copyWith(color: cs.onSurface),
+        secondaryLabelStyle: text.labelLarge!.copyWith(
+          color: cs.onSecondaryContainer,
+        ),
+        labelPadding: const EdgeInsets.symmetric(horizontal: Spacing.xs),
+        padding: const EdgeInsets.symmetric(
+          horizontal: Spacing.md,
+          vertical: Spacing.sm,
+        ),
         iconTheme: IconThemeData(color: cs.onSurfaceVariant, size: 18),
         elevation: 0,
         pressElevation: 0,
@@ -170,13 +171,13 @@ abstract class AppTheme {
                 : cs.onSurfaceVariant,
           ),
           side: WidgetStatePropertyAll(BorderSide(color: cs.outlineVariant)),
-          textStyle: WidgetStatePropertyAll(
-            text.labelLarge,
-          ),
+          textStyle: WidgetStatePropertyAll(text.labelLarge),
           shape: WidgetStatePropertyAll(
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.sm)),
+            RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+            ),
           ),
-          padding: WidgetStatePropertyAll(
+          padding: const WidgetStatePropertyAll(
             EdgeInsets.symmetric(horizontal: Spacing.lg, vertical: Spacing.md),
           ),
         ),
@@ -185,9 +186,11 @@ abstract class AppTheme {
         iconColor: cs.onSurfaceVariant,
         textColor: cs.onSurface,
         titleTextStyle: text.bodyLarge,
-        subtitleTextStyle: text.bodySmall!
-            .copyWith(color: cs.onSurfaceVariant),
-        contentPadding: EdgeInsets.symmetric(horizontal: Spacing.lg, vertical: Spacing.xs),
+        subtitleTextStyle: text.bodySmall!.copyWith(color: cs.onSurfaceVariant),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: Spacing.lg,
+          vertical: Spacing.xs,
+        ),
         minLeadingWidth: 24,
         horizontalTitleGap: Spacing.lg,
         shape: RoundedRectangleBorder(
@@ -209,8 +212,11 @@ abstract class AppTheme {
         ),
         titleTextStyle: text.titleLarge,
         contentTextStyle: text.bodyMedium,
-        insetPadding: EdgeInsets.symmetric(horizontal: Spacing.xl, vertical: Spacing.xl),
-        actionsPadding: EdgeInsets.fromLTRB(
+        insetPadding: const EdgeInsets.symmetric(
+          horizontal: Spacing.xl,
+          vertical: Spacing.xl,
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(
           Spacing.lg,
           0,
           Spacing.lg,
@@ -224,7 +230,7 @@ abstract class AppTheme {
         elevation: 0,
         modalElevation: 0,
         showDragHandle: false, // log_transaction_sheet draws its own
-        shape: RoundedRectangleBorder(
+        shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(
             top: Radius.circular(AppRadius.xl),
           ),
@@ -234,13 +240,13 @@ abstract class AppTheme {
         filled: true,
         fillColor: cs.surfaceContainer,
         isDense: false,
-        contentPadding: EdgeInsets.symmetric(horizontal: Spacing.lg, vertical: Spacing.md),
-        hintStyle: text.bodyLarge!
-            .copyWith(color: cs.onSurfaceVariant),
-        labelStyle: text.bodyMedium!
-            .copyWith(color: cs.onSurfaceVariant),
-        prefixStyle: text.bodyLarge!
-            .copyWith(color: cs.onSurfaceVariant),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: Spacing.lg,
+          vertical: Spacing.md,
+        ),
+        hintStyle: text.bodyLarge!.copyWith(color: cs.onSurfaceVariant),
+        labelStyle: text.bodyMedium!.copyWith(color: cs.onSurfaceVariant),
+        prefixStyle: text.bodyLarge!.copyWith(color: cs.onSurfaceVariant),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.sm),
           borderSide: BorderSide.none,
@@ -264,7 +270,8 @@ abstract class AppTheme {
       ),
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith(
-          (states) => states.contains(WidgetState.selected) ? cs.onPrimary : cs.outline,
+          (states) =>
+              states.contains(WidgetState.selected) ? cs.onPrimary : cs.outline,
         ),
         trackColor: WidgetStateProperty.resolveWith(
           (states) => states.contains(WidgetState.selected)
@@ -275,22 +282,23 @@ abstract class AppTheme {
       ),
       snackBarTheme: SnackBarThemeData(
         backgroundColor: cs.inverseSurface,
-        contentTextStyle: text.bodyMedium!
-            .copyWith(color: cs.onInverseSurface),
+        contentTextStyle: text.bodyMedium!.copyWith(color: cs.onInverseSurface),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.sm),
         ),
-        insetPadding: EdgeInsets.all(Spacing.lg),
+        insetPadding: const EdgeInsets.all(Spacing.lg),
       ),
       tooltipTheme: TooltipThemeData(
         decoration: BoxDecoration(
           color: cs.inverseSurface,
           borderRadius: BorderRadius.circular(AppRadius.xs),
         ),
-        textStyle: text.bodySmall!
-            .copyWith(color: cs.onInverseSurface),
-        padding: EdgeInsets.symmetric(horizontal: Spacing.md, vertical: Spacing.sm),
+        textStyle: text.bodySmall!.copyWith(color: cs.onInverseSurface),
+        padding: const EdgeInsets.symmetric(
+          horizontal: Spacing.md,
+          vertical: Spacing.sm,
+        ),
       ),
       textSelectionTheme: TextSelectionThemeData(
         cursorColor: cs.primary,
@@ -317,13 +325,13 @@ abstract class AppTheme {
         tertiary: AppPalette.gold,
         onTertiary: AppPalette.onGold,
         tertiaryContainer: AppPalette.goldTintDark,
-        onTertiaryContainer: Color(0xFFFFE9A8),
-        error: Color(0xFFF87171),
-        onError: Color(0xFF2B0A0A),
+        onTertiaryContainer: const Color(0xFFFFE9A8),
+        error: const Color(0xFFF87171),
+        onError: const Color(0xFF2B0A0A),
         surface: AppPalette.surfaceDark,
         onSurface: AppPalette.onSurfaceDark,
-        surfaceContainerLowest: Color(0xFF0B0E14),
-        surfaceContainerLow: Color(0xFF141A27),
+        surfaceContainerLowest: const Color(0xFF0B0E14),
+        surfaceContainerLow: const Color(0xFF141A27),
         surfaceContainer: AppPalette.surfaceDark,
         surfaceContainerHigh: AppPalette.surfaceHighDark,
         surfaceContainerHighest: AppPalette.surfaceHighestDark,
@@ -353,8 +361,8 @@ abstract class AppTheme {
         surface: AppPalette.surfaceLight,
         onSurface: AppPalette.onSurfaceLight,
         surfaceContainerLowest: Colors.white,
-        surfaceContainerLow: Color(0xFFFBFBFE),
-        surfaceContainer: Color(0xFFF1F3FA),
+        surfaceContainerLow: const Color(0xFFFBFBFE),
+        surfaceContainer: const Color(0xFFF1F3FA),
         surfaceContainerHigh: AppPalette.surfaceHighLight,
         surfaceContainerHighest: AppPalette.surfaceHighestLight,
         onSurfaceVariant: AppPalette.onSurfaceVariantLight,

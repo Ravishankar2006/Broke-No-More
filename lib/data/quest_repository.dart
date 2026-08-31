@@ -18,7 +18,13 @@ class QuestRepository {
   List<Quest> get active =>
       _box.values.where((q) => q.status == QuestStatus.active).toList();
 
-  Future<Quest> accept(QuestCandidate candidate, {DateTime? now}) async {
+  /// [durationDays] defaults to [kQuestDurationDays] — the "customize" flow
+  /// (Quests screen) passes a user-chosen value instead.
+  Future<Quest> accept(
+    QuestCandidate candidate, {
+    DateTime? now,
+    int? durationDays,
+  }) async {
     final start = now ?? DateTime.now();
     final quest = Quest(
       id: _uuid.v4(),
@@ -26,7 +32,7 @@ class QuestRepository {
       type: candidate.type,
       targetValue: candidate.targetValue,
       startDate: start,
-      endDate: start.add(const Duration(days: kQuestDurationDays)),
+      endDate: start.add(Duration(days: durationDays ?? kQuestDurationDays)),
       xpReward: candidate.xpReward,
       category: candidate.category,
     );
@@ -41,15 +47,24 @@ class QuestRepository {
   /// `completed` while still active, so a `budgetLimit` quest that survives
   /// to its deadline without failing succeeded, and belongs here rather
   /// than lumped in with `expired`.
-  Future<void> expireOverdueQuests({DateTime? now}) async {
+  ///
+  /// Returns whether any quest actually changed, so a caller that follows
+  /// this with a full gamification recompute (see
+  /// `XpEngineOrchestrator.expireOverdueQuests`) can skip it on the common
+  /// no-op call — most opens of the Quests screen find nothing overdue, and
+  /// the recompute is real disk I/O the app has no reason to pay for then.
+  Future<bool> expireOverdueQuests({DateTime? now}) async {
     final today = now ?? DateTime.now();
+    var changed = false;
     for (final quest in active) {
       if (!quest.endDate.isBefore(today)) continue;
       quest.status = quest.type == QuestType.budgetLimit
           ? QuestStatus.completed
           : QuestStatus.expired;
       await quest.save();
+      changed = true;
     }
+    return changed;
   }
 
   /// Rule-based quest generation, entirely offline (PRD section 7) — see
@@ -60,6 +75,7 @@ class QuestRepository {
     required int currentStreak,
     DateTime? now,
     int maxCandidates = 3,
+    String currencySymbol = '₹',
   }) {
     return generateQuestCandidates(
       allTransactions: allTransactions,
@@ -67,6 +83,17 @@ class QuestRepository {
       activeQuests: active,
       now: now,
       maxCandidates: maxCandidates,
+      currencySymbol: currencySymbol,
     );
+  }
+
+  /// Wipes every quest — the JSON backup restore's write path, which
+  /// replaces the box wholesale rather than merging.
+  Future<void> clear() => _box.clear();
+
+  /// Writes every quest in [quests] by id, overwriting any existing row
+  /// with the same id. Same reasoning as `TransactionRepository.putAll`.
+  Future<void> putAll(Iterable<Quest> quests) {
+    return _box.putAll({for (final q in quests) q.id: q});
   }
 }

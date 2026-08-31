@@ -16,33 +16,62 @@ import '../models/badge.dart' as model;
 /// Tapping a medallion opens a detail sheet. The previous version used a
 /// [Tooltip], which on mobile requires a long-press most users never discover,
 /// so badge names and unlock criteria were effectively invisible.
+/// The stats [badgeProgressValue] needs to compute a locked badge's "3/7"
+/// progress — bundled so the shelf's constructor doesn't grow five loose
+/// int params.
+typedef BadgeProgressStats = ({
+  int transactionCount,
+  int currentStreak,
+  int level,
+  int questsCompleted,
+  int daysUnderBudget,
+});
+
 class BadgeShelf extends StatelessWidget {
-  const BadgeShelf({super.key, required this.unlockedBadges});
+  const BadgeShelf({
+    super.key,
+    required this.unlockedBadges,
+    required this.stats,
+  });
 
   final List<model.Badge> unlockedBadges;
+
+  /// Drives the locked-badge progress ring/label — previously a locked
+  /// badge showed only a lock icon with no indication of how close it was.
+  final BadgeProgressStats stats;
 
   @override
   Widget build(BuildContext context) {
     final unlockedById = {for (final b in unlockedBadges) b.id: b};
 
     return SizedBox(
-      height: 108,
+      height: MedallionSize.badgeShelfHeight,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: EdgeInsets.symmetric(horizontal: Spacing.xxs),
+        padding: const EdgeInsets.symmetric(horizontal: Spacing.xxs),
         itemCount: kBadgeCatalog.length,
-        separatorBuilder: (_, _) => SizedBox(width: Spacing.md),
+        separatorBuilder: (_, _) => const SizedBox(width: Spacing.md),
         itemBuilder: (context, index) {
           final def = kBadgeCatalog[index];
           final unlocked = unlockedById[def.id];
+          final progressValue = badgeProgressValue(
+            def.criteriaType,
+            transactionCount: stats.transactionCount,
+            currentStreak: stats.currentStreak,
+            level: stats.level,
+            questsCompleted: stats.questsCompleted,
+            daysUnderBudget: stats.daysUnderBudget,
+          );
           return _BadgeMedallion(
             definition: def,
             unlockedAt: unlocked?.unlockedAt,
+            progressValue: progressValue,
             delay: AppMotion.staggerDelay(index),
             onTap: () => showBadgeDetailSheet(
               context,
               definition: def,
               unlockedAt: unlocked?.unlockedAt,
+              progressValue: progressValue,
             ),
           );
         },
@@ -55,12 +84,14 @@ class _BadgeMedallion extends StatelessWidget {
   const _BadgeMedallion({
     required this.definition,
     required this.unlockedAt,
+    required this.progressValue,
     required this.delay,
     required this.onTap,
   });
 
   final BadgeDefinition definition;
   final DateTime? unlockedAt;
+  final int progressValue;
   final Duration delay;
   final VoidCallback onTap;
 
@@ -71,6 +102,9 @@ class _BadgeMedallion extends StatelessWidget {
     final theme = Theme.of(context);
     final semantics = context.semantics;
     final cs = theme.colorScheme;
+    final fraction = definition.threshold == 0
+        ? 0.0
+        : (progressValue / definition.threshold).clamp(0.0, 1.0);
 
     return GestureDetector(
       onTap: () {
@@ -79,30 +113,53 @@ class _BadgeMedallion extends StatelessWidget {
       },
       behavior: HitTestBehavior.opaque,
       child: SizedBox(
-        width: 68,
+        width: MedallionSize.badgeShelfCell,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 60,
-              height: 60,
+              width: MedallionSize.badgeDetail,
+              height: MedallionSize.badgeDetail,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient:
-                    _unlocked ? AppGradients.xp(theme.brightness) : null,
+                gradient: _unlocked ? AppGradients.xp(theme.brightness) : null,
                 color: _unlocked ? null : cs.surfaceContainerHigh,
-                boxShadow:
-                    _unlocked ? AppShadows.gold(theme.brightness) : null,
+                boxShadow: _unlocked ? AppShadows.gold(theme.brightness) : null,
               ),
-              child: Center(
-                child: Icon(
-                  _unlocked ? badgeIcon(definition.iconId) : Icons.lock_outline,
-                  color: _unlocked ? semantics.onGold : semantics.lockedIcon,
-                  size: 28,
-                ),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  if (!_unlocked)
+                    Padding(
+                      padding: const EdgeInsets.all(3),
+                      child: CircularProgressIndicator(
+                        value: fraction,
+                        strokeWidth: 3,
+                        backgroundColor: cs.outlineVariant.withValues(
+                          alpha: 0.3,
+                        ),
+                        valueColor: AlwaysStoppedAnimation<Color>(cs.primary),
+                      ),
+                    ),
+                  _unlocked
+                      ? Icon(
+                          badgeIcon(definition.iconId),
+                          color: semantics.onGold,
+                          size: IconSize.xl,
+                        )
+                      : Text(
+                          '$progressValue/${definition.threshold}',
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: semantics.lockedIcon,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 10,
+                          ),
+                        ),
+                ],
               ),
             ),
-            SizedBox(height: Spacing.sm),
+            const SizedBox(height: Spacing.sm),
             Text(
               definition.name,
               textAlign: TextAlign.center,
@@ -126,6 +183,7 @@ Future<void> showBadgeDetailSheet(
   BuildContext context, {
   required BadgeDefinition definition,
   DateTime? unlockedAt,
+  int progressValue = 0,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -137,7 +195,7 @@ Future<void> showBadgeDetailSheet(
 
       return SafeArea(
         child: Padding(
-          padding: EdgeInsets.fromLTRB(
+          padding: const EdgeInsets.fromLTRB(
             Spacing.xl,
             Spacing.xl,
             Spacing.xl,
@@ -147,33 +205,35 @@ Future<void> showBadgeDetailSheet(
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: 96,
-                height: 96,
+                width: MedallionSize.dialogPrimary,
+                height: MedallionSize.dialogPrimary,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: unlocked ? AppGradients.xp(theme.brightness) : null,
                   color: unlocked ? null : cs.surfaceContainerHigh,
-                  boxShadow:
-                      unlocked ? AppShadows.gold(theme.brightness) : null,
+                  boxShadow: unlocked
+                      ? AppShadows.gold(theme.brightness)
+                      : null,
                 ),
                 child: Icon(
                   unlocked ? badgeIcon(definition.iconId) : Icons.lock_outline,
-                  size: 44,
+                  size: IconSize.xxxl,
                   color: unlocked ? semantics.onGold : semantics.lockedIcon,
                 ),
               ),
-              SizedBox(height: Spacing.lg),
+              const SizedBox(height: Spacing.lg),
               Text(definition.name, style: theme.textTheme.headlineSmall),
-              SizedBox(height: Spacing.sm),
+              const SizedBox(height: Spacing.sm),
               Text(
                 definition.description,
                 textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium
-                    ?.copyWith(color: cs.onSurfaceVariant),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: cs.onSurfaceVariant,
+                ),
               ),
-              SizedBox(height: Spacing.lg),
+              const SizedBox(height: Spacing.lg),
               Container(
-                padding: EdgeInsets.symmetric(
+                padding: const EdgeInsets.symmetric(
                   horizontal: Spacing.lg,
                   vertical: Spacing.sm,
                 ),
@@ -186,10 +246,9 @@ Future<void> showBadgeDetailSheet(
                 child: Text(
                   unlocked
                       ? 'Earned ${_formatDate(unlockedAt)}'
-                      : 'Not earned yet',
+                      : 'Progress: $progressValue / ${definition.threshold}',
                   style: theme.textTheme.labelMedium?.copyWith(
-                    color:
-                        unlocked ? semantics.goldInk : cs.onSurfaceVariant,
+                    color: unlocked ? semantics.goldInk : cs.onSurfaceVariant,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -204,8 +263,18 @@ Future<void> showBadgeDetailSheet(
 
 String _formatDate(DateTime date) {
   const months = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
   ];
   return '${date.day} ${months[date.month - 1]} ${date.year}';
 }

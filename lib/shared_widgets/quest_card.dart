@@ -11,18 +11,18 @@ import 'app_card.dart';
 /// Iconography per quest type. The model has carried a [QuestType] since the
 /// beginning and the UI never showed it, so every quest looked the same.
 IconData questTypeIcon(QuestType type) => switch (type) {
-      QuestType.streak => Icons.local_fire_department,
-      QuestType.categoryAvoid => Icons.block,
-      QuestType.budgetLimit => Icons.savings_outlined,
-      QuestType.count => Icons.checklist_rtl,
-    };
+  QuestType.streak => Icons.local_fire_department,
+  QuestType.categoryAvoid => Icons.block,
+  QuestType.budgetLimit => Icons.savings_outlined,
+  QuestType.count => Icons.checklist_rtl,
+};
 
 String questTypeLabel(QuestType type) => switch (type) {
-      QuestType.streak => 'Streak',
-      QuestType.categoryAvoid => 'Avoid',
-      QuestType.budgetLimit => 'Budget',
-      QuestType.count => 'Logging',
-    };
+  QuestType.streak => 'Streak',
+  QuestType.categoryAvoid => 'Avoid',
+  QuestType.budgetLimit => 'Budget',
+  QuestType.count => 'Logging',
+};
 
 /// Renders an already-accepted [Quest] with its progress.
 class QuestCard extends StatelessWidget {
@@ -62,8 +62,8 @@ class QuestCard extends StatelessWidget {
             Row(
               children: [
                 Container(
-                  width: 36,
-                  height: 36,
+                  width: MedallionSize.iconChip,
+                  height: MedallionSize.iconChip,
                   decoration: BoxDecoration(
                     color: accent.withValues(alpha: 0.14),
                     borderRadius: BorderRadius.circular(AppRadius.md),
@@ -72,13 +72,13 @@ class QuestCard extends StatelessWidget {
                     isDone
                         ? Icons.check_rounded
                         : isFailed
-                            ? Icons.close_rounded
-                            : questTypeIcon(quest.type),
-                    size: 20,
+                        ? Icons.close_rounded
+                        : questTypeIcon(quest.type),
+                    size: IconSize.md,
                     color: accent,
                   ),
                 ),
-                SizedBox(width: Spacing.md),
+                const SizedBox(width: Spacing.md),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -92,7 +92,7 @@ class QuestCard extends StatelessWidget {
                           decorationColor: cs.onSurfaceVariant,
                         ),
                       ),
-                      SizedBox(height: Spacing.xxs),
+                      const SizedBox(height: Spacing.xxs),
                       Text(
                         _statusLine(quest),
                         style: theme.textTheme.labelSmall?.copyWith(
@@ -107,12 +107,12 @@ class QuestCard extends StatelessWidget {
               ],
             ),
             if (!isOver) ...[
-              SizedBox(height: Spacing.md),
+              const SizedBox(height: Spacing.md),
               AnimatedProgressBar(
                 value: fraction,
                 variant: ProgressVariant.quest,
               ),
-              SizedBox(height: Spacing.sm),
+              const SizedBox(height: Spacing.sm),
               Text(
                 '${quest.currentProgress} / ${quest.targetValue}',
                 style: theme.textTheme.bodySmall,
@@ -157,7 +157,7 @@ class _XpReward extends StatelessWidget {
     final semantics = context.semantics;
 
     return Container(
-      padding: EdgeInsets.symmetric(
+      padding: const EdgeInsets.symmetric(
         horizontal: Spacing.sm,
         vertical: Spacing.xxs,
       ),
@@ -183,11 +183,16 @@ class QuestCandidateCard extends StatelessWidget {
     required this.candidate,
     required this.onAccept,
     required this.onSkip,
+    required this.onCustomize,
   });
 
   final QuestCandidate candidate;
   final VoidCallback onAccept;
   final VoidCallback onSkip;
+
+  /// PRD §4/§7's third quest response — adjust target and duration before
+  /// accepting, rather than take-it-or-leave-it.
+  final VoidCallback onCustomize;
 
   @override
   Widget build(BuildContext context) {
@@ -204,25 +209,25 @@ class QuestCandidateCard extends StatelessWidget {
           Row(
             children: [
               Container(
-                width: 36,
-                height: 36,
+                width: MedallionSize.iconChip,
+                height: MedallionSize.iconChip,
                 decoration: BoxDecoration(
                   color: cs.primary.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(AppRadius.md),
                 ),
                 child: Icon(
                   questTypeIcon(candidate.type),
-                  size: 20,
+                  size: IconSize.md,
                   color: cs.primary,
                 ),
               ),
-              SizedBox(width: Spacing.md),
+              const SizedBox(width: Spacing.md),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(candidate.title, style: theme.textTheme.titleSmall),
-                    SizedBox(height: Spacing.xxs),
+                    const SizedBox(height: Spacing.xxs),
                     Text(
                       'Suggested · ${questTypeLabel(candidate.type)}',
                       style: theme.textTheme.labelSmall?.copyWith(
@@ -235,16 +240,21 @@ class QuestCandidateCard extends StatelessWidget {
               _XpReward(xp: candidate.xpReward, earned: false),
             ],
           ),
-          SizedBox(height: Spacing.md),
+          const SizedBox(height: Spacing.md),
           Row(
             children: [
+              IconButton(
+                onPressed: onCustomize,
+                tooltip: 'Customize before accepting',
+                icon: const Icon(Icons.tune_rounded),
+              ),
               Expanded(
                 child: OutlinedButton(
                   onPressed: onSkip,
                   child: const Text('Skip'),
                 ),
               ),
-              SizedBox(width: Spacing.md),
+              const SizedBox(width: Spacing.md),
               Expanded(
                 flex: 2,
                 child: FilledButton(

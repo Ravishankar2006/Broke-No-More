@@ -141,6 +141,28 @@ const List<BadgeDefinition> kBadgeCatalog = [
   ),
 ];
 
+/// The user's current value for whatever [type] measures. Shared by
+/// [evaluateNewlyUnlockedBadges] and the badge shelf's locked-badge
+/// progress display ("3/7 days"), which previously showed nothing but a
+/// lock icon — this is the same lookup either way, just exposed publicly
+/// so the UI doesn't duplicate it.
+int badgeProgressValue(
+  BadgeCriteriaType type, {
+  required int transactionCount,
+  required int currentStreak,
+  required int level,
+  required int questsCompleted,
+  required int daysUnderBudget,
+}) {
+  return switch (type) {
+    BadgeCriteriaType.transactionCount => transactionCount,
+    BadgeCriteriaType.streak => currentStreak,
+    BadgeCriteriaType.level => level,
+    BadgeCriteriaType.questsCompleted => questsCompleted,
+    BadgeCriteriaType.daysUnderBudget => daysUnderBudget,
+  };
+}
+
 /// Given the user's current stats and which badge ids are already unlocked,
 /// returns the catalog entries that just became eligible. Pure — callers
 /// own persistence and ordering (catalog order is used as unlock order).
@@ -155,13 +177,14 @@ List<BadgeDefinition> evaluateNewlyUnlockedBadges({
   final newlyUnlocked = <BadgeDefinition>[];
   for (final def in kBadgeCatalog) {
     if (alreadyUnlockedIds.contains(def.id)) continue;
-    final value = switch (def.criteriaType) {
-      BadgeCriteriaType.transactionCount => transactionCount,
-      BadgeCriteriaType.streak => currentStreak,
-      BadgeCriteriaType.level => level,
-      BadgeCriteriaType.questsCompleted => questsCompleted,
-      BadgeCriteriaType.daysUnderBudget => daysUnderBudget,
-    };
+    final value = badgeProgressValue(
+      def.criteriaType,
+      transactionCount: transactionCount,
+      currentStreak: currentStreak,
+      level: level,
+      questsCompleted: questsCompleted,
+      daysUnderBudget: daysUnderBudget,
+    );
     if (value >= def.threshold) {
       newlyUnlocked.add(def);
     }

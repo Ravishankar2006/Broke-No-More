@@ -22,7 +22,7 @@ Future<void> showLevelUpDialog(BuildContext context, int newLevel) {
 
       return CelebrationBurst(
         child: AlertDialog(
-          contentPadding: EdgeInsets.fromLTRB(
+          contentPadding: const EdgeInsets.fromLTRB(
             Spacing.xl,
             Spacing.xxl,
             Spacing.xl,
@@ -32,20 +32,20 @@ Future<void> showLevelUpDialog(BuildContext context, int newLevel) {
             mainAxisSize: MainAxisSize.min,
             children: [
               SizedBox(
-                width: 148,
-                height: 148,
+                width: MedallionSize.celebrationHero,
+                height: MedallionSize.celebrationHero,
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
                     const CelebrationAnimation(
                       asset: CelebrationAssets.levelUp,
                       fallbackIcon: Icons.bolt,
-                      size: 148,
+                      size: MedallionSize.celebrationHero,
                     ),
                     BounceIn(
                       child: Container(
-                        width: 78,
-                        height: 78,
+                        width: MedallionSize.dialogSecondary,
+                        height: MedallionSize.dialogSecondary,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           gradient: AppGradients.xp(theme.brightness),
@@ -64,16 +64,16 @@ Future<void> showLevelUpDialog(BuildContext context, int newLevel) {
                   ],
                 ),
               ),
-              SizedBox(height: Spacing.lg),
+              const SizedBox(height: Spacing.lg),
               Text('Level up!', style: theme.textTheme.headlineSmall),
-              SizedBox(height: Spacing.xs),
+              const SizedBox(height: Spacing.xs),
               Text(
                 "You're now level $newLevel",
                 style: theme.textTheme.bodyMedium,
               ),
-              SizedBox(height: Spacing.md),
+              const SizedBox(height: Spacing.md),
               Container(
-                padding: EdgeInsets.symmetric(
+                padding: const EdgeInsets.symmetric(
                   horizontal: Spacing.md,
                   vertical: Spacing.xs,
                 ),

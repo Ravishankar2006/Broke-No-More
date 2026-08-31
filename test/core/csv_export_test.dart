@@ -69,10 +69,7 @@ void main() {
     });
 
     test('income and quick-log flags survive round trip', () {
-      final original = _tx(
-        type: TransactionType.income,
-        isQuickLog: true,
-      );
+      final original = _tx(type: TransactionType.income, isQuickLog: true);
       final result = parseTransactionsCsv(transactionsToCsv([original]));
       final parsed = result.transactions.single;
       expect(parsed.type, TransactionType.income);
@@ -105,8 +102,7 @@ void main() {
       expect(result.errors, isEmpty);
     });
 
-    test('a file missing required columns reports one error and no rows',
-        () {
+    test('a file missing required columns reports one error and no rows', () {
       final result = parseTransactionsCsv('foo,bar\n1,2\n');
       expect(result.transactions, isEmpty);
       expect(result.errors, hasLength(1));
@@ -114,7 +110,8 @@ void main() {
 
     test('a bad row is skipped and reported without blocking the rest', () {
       final good = _tx(id: 'good');
-      final csv = '${transactionsToCsv([good])}'
+      final csv =
+          '${transactionsToCsv([good])}'
           'bad-id,not-a-date,expense,Food,10,,not-a-date,false\n';
       final result = parseTransactionsCsv(csv);
 
@@ -124,7 +121,8 @@ void main() {
     });
 
     test('a non-positive amount is rejected', () {
-      const csv = 'id,timestamp,type,category,amount,note,loggedAt,isQuickLog\n'
+      const csv =
+          'id,timestamp,type,category,amount,note,loggedAt,isQuickLog\n'
           't1,2026-08-22T12:00:00.000,expense,Food,0,,2026-08-22T12:00:00.000,false\n';
       final result = parseTransactionsCsv(csv);
       expect(result.transactions, isEmpty);
@@ -132,7 +130,8 @@ void main() {
     });
 
     test('an unknown type is rejected', () {
-      const csv = 'id,timestamp,type,category,amount,note,loggedAt,isQuickLog\n'
+      const csv =
+          'id,timestamp,type,category,amount,note,loggedAt,isQuickLog\n'
           't1,2026-08-22T12:00:00.000,transfer,Food,10,,2026-08-22T12:00:00.000,false\n';
       final result = parseTransactionsCsv(csv);
       expect(result.transactions, isEmpty);
@@ -140,7 +139,8 @@ void main() {
     });
 
     test('a blank id is assigned a fresh one rather than rejected', () {
-      const csv = 'id,timestamp,type,category,amount,note,loggedAt,isQuickLog\n'
+      const csv =
+          'id,timestamp,type,category,amount,note,loggedAt,isQuickLog\n'
           ',2026-08-22T12:00:00.000,expense,Food,10,,2026-08-22T12:00:00.000,false\n';
       final result = parseTransactionsCsv(csv);
       expect(result.errors, isEmpty);

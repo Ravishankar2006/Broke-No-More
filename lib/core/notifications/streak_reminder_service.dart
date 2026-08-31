@@ -34,14 +34,12 @@ class StreakReminderService {
       // `timezone` defaults to; the reminder still fires, just possibly
       // not at exactly 8pm local.
     }
-    const androidSettings =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidSettings = AndroidInitializationSettings(
+      '@mipmap/ic_launcher',
+    );
     const iosSettings = DarwinInitializationSettings();
     await _plugin.initialize(
-      const InitializationSettings(
-        android: androidSettings,
-        iOS: iosSettings,
-      ),
+      const InitializationSettings(android: androidSettings, iOS: iosSettings),
     );
     _initialized = true;
   }
@@ -52,13 +50,17 @@ class StreakReminderService {
     if (kIsWeb) return false;
     await _ensureInitialized();
 
-    final android = _plugin.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
+    final android = _plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
     if (android != null) {
       return await android.requestNotificationsPermission() ?? false;
     }
-    final ios = _plugin.resolvePlatformSpecificImplementation<
-        IOSFlutterLocalNotificationsPlugin>();
+    final ios = _plugin
+        .resolvePlatformSpecificImplementation<
+          IOSFlutterLocalNotificationsPlugin
+        >();
     if (ios != null) {
       return await ios.requestPermissions(
             alert: true,
@@ -73,9 +75,24 @@ class StreakReminderService {
   /// Schedules tonight's reminder at 8pm local (tomorrow's if it's already
   /// past 8pm today). Safe to call repeatedly — each call replaces the
   /// previously scheduled one.
+  ///
+  /// No-ops if the OS notification permission isn't actually granted —
+  /// `remindersEnabled` in the profile only reflects the user's in-app
+  /// choice, and the OS permission can be revoked afterward from system
+  /// settings without the app being told, so this is checked fresh on
+  /// every reschedule rather than trusted from when the toggle was
+  /// switched on.
   Future<void> scheduleTonightReminder({required int currentStreak}) async {
     if (kIsWeb) return;
     await _ensureInitialized();
+
+    final android = _plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+    if (android != null && !(await android.areNotificationsEnabled() ?? true)) {
+      return;
+    }
 
     final body = currentStreak > 0
         ? "You're on a $currentStreak-day streak — log something before it resets."
@@ -110,8 +127,13 @@ class StreakReminderService {
 
   tz.TZDateTime _next8pm() {
     final now = tz.TZDateTime.now(tz.local);
-    var scheduled =
-        tz.TZDateTime(tz.local, now.year, now.month, now.day, _reminderHour);
+    var scheduled = tz.TZDateTime(
+      tz.local,
+      now.year,
+      now.month,
+      now.day,
+      _reminderHour,
+    );
     if (!scheduled.isAfter(now)) {
       scheduled = scheduled.add(const Duration(days: 1));
     }

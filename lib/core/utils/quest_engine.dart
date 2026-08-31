@@ -52,23 +52,38 @@ QuestUpdateResult replayQuest({
   final windowEnd = startOfDay(
     asOf.isBefore(quest.endDate) ? asOf : quest.endDate,
   );
-  final inWindow = transactions.where((t) {
-    final day = startOfDay(t.timestamp);
-    return !day.isBefore(windowStart) && !day.isAfter(windowEnd);
-  }).toList(growable: false);
+  final inWindow = transactions
+      .where((t) {
+        final day = startOfDay(t.timestamp);
+        return !day.isBefore(windowStart) && !day.isAfter(windowEnd);
+      })
+      .toList(growable: false);
 
   switch (quest.type) {
     case QuestType.categoryAvoid:
-      final offended = inWindow.any((t) =>
-          t.type == TransactionType.expense && t.category == quest.category);
+      // The starter quest suggestion is generated *from* today's spending
+      // (see `_starterCategoryCandidate`), so accepting it on the same day
+      // is the common case, not an edge case — `inWindow`'s day-truncated
+      // bounds alone would count the very transaction that prompted the
+      // suggestion as an immediate violation. Comparing against the exact
+      // acceptance instant instead only flags spending that happened after
+      // the user actually took on the challenge.
+      final offended = inWindow.any(
+        (t) =>
+            t.type == TransactionType.expense &&
+            t.category == quest.category &&
+            !t.timestamp.isBefore(quest.startDate),
+      );
       if (offended) {
         return QuestUpdateResult(
           progress: quest.currentProgress,
           status: QuestStatus.failed,
         );
       }
-      final daysElapsed =
-          (daysBetween(quest.startDate, asOf) + 1).clamp(0, quest.targetValue);
+      final daysElapsed = (daysBetween(quest.startDate, asOf) + 1).clamp(
+        0,
+        quest.targetValue,
+      );
       return QuestUpdateResult(
         progress: daysElapsed,
         status: daysElapsed >= quest.targetValue
@@ -78,8 +93,11 @@ QuestUpdateResult replayQuest({
 
     case QuestType.budgetLimit:
       final spend = inWindow
-          .where((t) =>
-              t.type == TransactionType.expense && t.category == quest.category)
+          .where(
+            (t) =>
+                t.type == TransactionType.expense &&
+                t.category == quest.category,
+          )
           .fold<double>(0, (sum, t) => sum + t.amount);
       return QuestUpdateResult(
         progress: spend.ceil(),

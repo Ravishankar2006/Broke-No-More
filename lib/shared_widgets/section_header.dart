@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/theme/app_dimens.dart';
+import '../core/theme/app_typography.dart';
 
 /// A labelled section break.
 ///
@@ -32,21 +33,21 @@ class SectionHeader extends StatelessWidget {
     final cs = theme.colorScheme;
 
     return Padding(
-      padding: EdgeInsets.only(bottom: Spacing.md, top: Spacing.xs),
+      padding: const EdgeInsets.only(bottom: Spacing.md, top: Spacing.xs),
       child: Row(
         children: [
           Text(
             title.toUpperCase(),
             style: theme.textTheme.labelMedium?.copyWith(
               color: cs.onSurfaceVariant,
-              letterSpacing: 1.1,
+              letterSpacing: kOverlineLetterSpacing,
               fontWeight: FontWeight.w700,
             ),
           ),
           if (count != null) ...[
-            SizedBox(width: Spacing.sm),
+            const SizedBox(width: Spacing.sm),
             Container(
-              padding: EdgeInsets.symmetric(
+              padding: const EdgeInsets.symmetric(
                 horizontal: Spacing.sm,
                 vertical: Spacing.xxs,
               ),
@@ -68,9 +69,11 @@ class SectionHeader extends StatelessWidget {
             TextButton(
               onPressed: onAction,
               style: TextButton.styleFrom(
-                padding: EdgeInsets.symmetric(horizontal: Spacing.sm),
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                padding: const EdgeInsets.symmetric(horizontal: Spacing.sm),
+                // Was Size.zero + shrinkWrap, which let this button render
+                // (and hit-test) well under the 48dp minimum tap target —
+                // easy to miss and inaccessible for low-dexterity users.
+                minimumSize: const Size(0, kMinTapTarget),
               ),
               child: Text(actionLabel!),
             ),

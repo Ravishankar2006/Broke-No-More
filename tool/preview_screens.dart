@@ -51,10 +51,9 @@ Future<void> _seed() async {
     ),
   );
 
-  final categories = Hive.box<CategoryRecord>(HiveBoxes.categories)
-      .values
-      .where((c) => c.type == TransactionType.expense)
-      .toList();
+  final categories = Hive.box<CategoryRecord>(
+    HiveBoxes.categories,
+  ).values.where((c) => c.type == TransactionType.expense).toList();
 
   var i = 0;
   for (final offset in [0, 0, 1, 2, 4, 5, 5, 6, 8, 9, 11, 12]) {
@@ -131,10 +130,12 @@ class _BoardState extends State<_Board> {
                     style: FilledButton.styleFrom(
                       minimumSize: const Size(0, 32),
                       padding: const EdgeInsets.symmetric(horizontal: 12),
-                      backgroundColor:
-                          _current == name ? Colors.amber : Colors.white24,
-                      foregroundColor:
-                          _current == name ? Colors.black : Colors.white,
+                      backgroundColor: _current == name
+                          ? Colors.amber
+                          : Colors.white24,
+                      foregroundColor: _current == name
+                          ? Colors.black
+                          : Colors.white,
                     ),
                     child: Text(name),
                   ),
@@ -150,7 +151,9 @@ class _BoardState extends State<_Board> {
                     backgroundColor: Colors.deepPurple,
                     foregroundColor: Colors.white,
                   ),
-                  child: Text(_brightness == Brightness.light ? 'Dark' : 'Light'),
+                  child: Text(
+                    _brightness == Brightness.light ? 'Dark' : 'Light',
+                  ),
                 ),
               ],
             ),
@@ -194,12 +197,11 @@ class _Frame extends StatelessWidget {
         width: 412,
         height: 760,
         child: MediaQuery(
-          data: const MediaQueryData(
-            size: Size(412, 760),
-            devicePixelRatio: 1,
-          ),
+          data: const MediaQueryData(size: Size(412, 760), devicePixelRatio: 1),
           child: Theme(
-            data: brightness == Brightness.dark ? AppTheme.dark : AppTheme.light,
+            data: brightness == Brightness.dark
+                ? AppTheme.dark
+                : AppTheme.light,
             child: Navigator(
               onGenerateRoute: (_) =>
                   MaterialPageRoute<void>(builder: (_) => child),

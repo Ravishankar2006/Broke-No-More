@@ -22,4 +22,14 @@ class BadgeRepository {
     await _box.put(definition.id, badge);
     return badge;
   }
+
+  /// Wipes every badge — the JSON backup restore's write path, which
+  /// replaces the box wholesale rather than merging.
+  Future<void> clear() => _box.clear();
+
+  /// Writes every badge in [badges] by id, overwriting any existing row
+  /// with the same id. Same reasoning as `TransactionRepository.putAll`.
+  Future<void> putAll(Iterable<Badge> badges) {
+    return _box.putAll({for (final b in badges) b.id: b});
+  }
 }

@@ -5,8 +5,8 @@ import '../models/recurring_transaction.dart';
 
 final recurringTransactionRepositoryProvider =
     Provider<RecurringTransactionRepository>((ref) {
-  return RecurringTransactionRepository();
-});
+      return RecurringTransactionRepository();
+    });
 
 class RecurringTransactionsNotifier
     extends Notifier<List<RecurringTransaction>> {
@@ -20,7 +20,7 @@ class RecurringTransactionsNotifier
   }
 }
 
-final recurringTransactionsProvider = NotifierProvider<
-    RecurringTransactionsNotifier, List<RecurringTransaction>>(
-  RecurringTransactionsNotifier.new,
-);
+final recurringTransactionsProvider =
+    NotifierProvider<RecurringTransactionsNotifier, List<RecurringTransaction>>(
+      RecurringTransactionsNotifier.new,
+    );

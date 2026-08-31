@@ -44,17 +44,18 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       final profile = ref.read(profileProvider);
       if (profile == null || !profile.remindersEnabled) return;
       if (isSameDay(profile.lastLoggedDate, DateTime.now())) return;
-      StreakReminderService.instance
-          .scheduleTonightReminder(currentStreak: profile.currentStreak);
+      StreakReminderService.instance.scheduleTonightReminder(
+        currentStreak: profile.currentStreak,
+      );
     });
   }
 
   List<Widget> get _tabs => [
-        HomeScreen(onLogPressed: _openLogSheet),
-        const InsightsScreen(),
-        const QuestsScreen(),
-        const ProfileScreen(),
-      ];
+    HomeScreen(onLogPressed: _openLogSheet),
+    const InsightsScreen(),
+    const QuestsScreen(),
+    const ProfileScreen(),
+  ];
 
   Future<void> _openLogSheet() async {
     final result = await showModalBottomSheet<LogTransactionResult>(
@@ -71,6 +72,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       leveledUpTo: result.leveledUpTo,
       newlyUnlockedBadges: result.newlyUnlockedBadges,
       totalBadgesUnlocked: ref.read(badgesProvider).length,
+      freezeConsumed: result.freezeConsumed,
     );
   }
 
@@ -83,18 +85,14 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: AnimatedSwitcher(
-        duration: AppMotion.standard,
-        // Cross-fade instead of the hard cut an IndexedStack gives. The
-        // outgoing tab is faded out in place rather than sliding, so switching
-        // tabs never looks like navigation.
-        switchInCurve: AppMotion.enter,
-        switchOutCurve: AppMotion.exit,
-        child: KeyedSubtree(
-          key: ValueKey(_index),
-          child: _tabs[_index],
-        ),
-      ),
+      // IndexedStack over the AnimatedSwitcher cross-fade this replaced:
+      // switching tabs used to tear down and rebuild the outgoing one from
+      // scratch, so Insights' range selector, History's search query and
+      // every screen's scroll position all silently reset. IndexedStack
+      // keeps all four tabs mounted — the trade is an instant cut instead
+      // of a cross-fade, which is the standard, expected feel for a bottom
+      // nav (state loss on tab switch reads as a bug; a hard cut doesn't).
+      body: IndexedStack(index: _index, children: _tabs),
       floatingActionButton: _LogFab(onPressed: _openLogSheet),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       bottomNavigationBar: BottomAppBar(
@@ -167,7 +165,7 @@ class _LogFabState extends State<_LogFab> {
             widget.onPressed();
           },
           tooltip: 'Log a transaction',
-          child: const Icon(Icons.add_rounded, size: 28),
+          child: const Icon(Icons.add_rounded, size: IconSize.xl),
         ),
       ),
     );
@@ -194,43 +192,51 @@ class _NavButton extends StatelessWidget {
     final color = selected ? cs.onSecondaryContainer : cs.onSurfaceVariant;
 
     return Expanded(
-      child: InkWell(
-        onTap: onTap,
-        // Without this the InkSparkle ripple splashes as a rectangle across the
-        // whole nav item, escaping the rounded pill.
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        child: Padding(
-          padding: EdgeInsets.symmetric(vertical: Spacing.sm),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // The pill wraps the icon rather than sitting behind the whole
-              // stack. Previously it was a fixed 56x28 box with a ~41px-tall
-              // icon+label stack layered on top, so it rendered as a stripe
-              // *through* the item instead of a container around it.
-              AnimatedContainer(
-                duration: AppMotion.quick,
-                curve: AppMotion.standardCurve,
-                width: 52,
-                height: 28,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: selected ? cs.secondaryContainer : Colors.transparent,
-                  borderRadius: BorderRadius.circular(AppRadius.pill),
+      child: Semantics(
+        button: true,
+        selected: selected,
+        label: label,
+        excludeSemantics: true,
+        child: InkWell(
+          onTap: onTap,
+          // Without this the InkSparkle ripple splashes as a rectangle across
+          // the whole nav item, escaping the rounded pill.
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // The pill wraps the icon rather than sitting behind the whole
+                // stack. Previously it was a fixed 56x28 box with a ~41px-tall
+                // icon+label stack layered on top, so it rendered as a stripe
+                // *through* the item instead of a container around it.
+                AnimatedContainer(
+                  duration: AppMotion.quick,
+                  curve: AppMotion.standardCurve,
+                  width: 52,
+                  height: 28,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? cs.secondaryContainer
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(AppRadius.pill),
+                  ),
+                  child: Icon(icon, color: color, size: IconSize.md),
                 ),
-                child: Icon(icon, color: color, size: 20),
-              ),
-              SizedBox(height: Spacing.xxs),
-              Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.labelSmall!.copyWith(
-                  color: color,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                const SizedBox(height: Spacing.xxs),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelSmall!.copyWith(
+                    color: color,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

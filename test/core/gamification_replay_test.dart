@@ -79,8 +79,9 @@ void main() {
         kStreakDayXp + kMaxXpEligibleLogsPerDay * kBaseLogXp,
         reason: 'logs past the cap must earn nothing',
       );
-      final earned =
-          result.xpByTransactionId.values.where((xp) => xp > 0).length;
+      final earned = result.xpByTransactionId.values
+          .where((xp) => xp > 0)
+          .length;
       expect(earned, kMaxXpEligibleLogsPerDay);
     });
 
@@ -216,40 +217,36 @@ void main() {
   group('daily budget bonus', () {
     test('awards once per day when under the daily allowance', () {
       // 3000 prorated over January's 31 days ≈ 96.8/day.
-      final result = replay(
-        [tx(onDay: 0, amount: 50), tx(onDay: 1, amount: 50)],
-        monthlyBudget: 3000,
-      );
+      final result = replay([
+        tx(onDay: 0, amount: 50),
+        tx(onDay: 1, amount: 50),
+      ], monthlyBudget: 3000);
       expect(result.daysUnderBudgetCount, 2);
       expect(result.lastBudgetBonusDate, day(1));
-      expect(
-        result.totalXp,
-        2 * (kStreakDayXp + kBaseLogXp + kUnderBudgetXp),
-      );
+      expect(result.totalXp, 2 * (kStreakDayXp + kBaseLogXp + kUnderBudgetXp));
     });
 
     test('withholds the bonus on a day that went over', () {
-      final result = replay(
-        [tx(onDay: 0, amount: 50), tx(onDay: 1, amount: 500)],
-        monthlyBudget: 3000,
-      );
+      final result = replay([
+        tx(onDay: 0, amount: 50),
+        tx(onDay: 1, amount: 500),
+      ], monthlyBudget: 3000);
       expect(result.daysUnderBudgetCount, 1);
       expect(result.lastBudgetBonusDate, day(0));
     });
 
     test('counts a day once regardless of how many logs it holds', () {
-      final result = replay(
-        [tx(onDay: 0, amount: 10), tx(onDay: 0, amount: 10)],
-        monthlyBudget: 3000,
-      );
+      final result = replay([
+        tx(onDay: 0, amount: 10),
+        tx(onDay: 0, amount: 10),
+      ], monthlyBudget: 3000);
       expect(result.daysUnderBudgetCount, 1);
     });
 
     test('income does not count against the daily spend', () {
-      final result = replay(
-        [tx(onDay: 0, amount: 5000, type: TransactionType.income)],
-        monthlyBudget: 3000,
-      );
+      final result = replay([
+        tx(onDay: 0, amount: 5000, type: TransactionType.income),
+      ], monthlyBudget: 3000);
       expect(result.daysUnderBudgetCount, 1);
     });
 
@@ -295,14 +292,21 @@ void main() {
       final collide = DateTime(2026, 1, 1, 12);
       final transactions = List.generate(
         kMaxXpEligibleLogsPerDay + 3,
-        (i) => tx(onDay: 0, id: 'id-${i.toString().padLeft(2, '0')}', loggedAt: collide),
+        (i) => tx(
+          onDay: 0,
+          id: 'id-${i.toString().padLeft(2, '0')}',
+          loggedAt: collide,
+        ),
       );
 
       final a = replay(transactions);
       final b = replay(transactions.reversed.toList());
 
-      expect(b.xpByTransactionId, a.xpByTransactionId,
-          reason: 'identical loggedAt must not make the cap order-dependent');
+      expect(
+        b.xpByTransactionId,
+        a.xpByTransactionId,
+        reason: 'identical loggedAt must not make the cap order-dependent',
+      );
     });
 
     test('longestStreakSeen observes the peak, not the final value', () {
@@ -315,8 +319,11 @@ void main() {
       ], asOfDay: 25);
 
       expect(result.currentStreak, 1);
-      expect(result.longestStreakSeen, 3,
-          reason: 'the caller ratchets against this, so it must report the peak');
+      expect(
+        result.longestStreakSeen,
+        3,
+        reason: 'the caller ratchets against this, so it must report the peak',
+      );
     });
   });
 
@@ -386,9 +393,61 @@ void main() {
       expect(result.status, QuestStatus.active);
     });
 
+    test(
+      'categoryAvoid does not fail on the transaction that prompted the '
+      'suggestion — same-day spending logged before acceptance is exempt',
+      () {
+        // The starter candidate is generated *from* a recent expense — a
+        // categoryAvoid quest accepted the same day must not immediately
+        // fail because of the very transaction that led to the suggestion.
+        final startDate = day(0).add(const Duration(hours: 15));
+        final q = Quest(
+          id: 'q1',
+          title: 'q',
+          type: QuestType.categoryAvoid,
+          targetValue: 3,
+          currentProgress: 0,
+          startDate: startDate,
+          endDate: day(3),
+          xpReward: 100,
+          category: 'Food',
+        );
+
+        Transaction foodExpenseAt(DateTime timestamp) => Transaction(
+          id: 't-same-day',
+          amount: 500,
+          type: TransactionType.expense,
+          category: 'Food',
+          timestamp: timestamp,
+          loggedAt: timestamp,
+          isQuickLog: false,
+        );
+
+        final beforeAcceptance = replayQuest(
+          quest: q,
+          transactions: [foodExpenseAt(day(0).add(const Duration(hours: 10)))],
+          currentStreak: 1,
+          asOf: day(0),
+        );
+        expect(beforeAcceptance.status, QuestStatus.active);
+
+        final afterAcceptance = replayQuest(
+          quest: q,
+          transactions: [foodExpenseAt(day(0).add(const Duration(hours: 18)))],
+          currentStreak: 1,
+          asOf: day(0),
+        );
+        expect(afterAcceptance.status, QuestStatus.failed);
+      },
+    );
+
     test('categoryAvoid completes once the full window is clean', () {
       final result = replayQuest(
-        quest: quest(type: QuestType.categoryAvoid, target: 3, category: 'Food'),
+        quest: quest(
+          type: QuestType.categoryAvoid,
+          target: 3,
+          category: 'Food',
+        ),
         transactions: [tx(onDay: 1, category: 'Transport')],
         currentStreak: 1,
         asOf: day(2),

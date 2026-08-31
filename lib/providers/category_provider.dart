@@ -11,11 +11,15 @@ final categoryRepositoryProvider = Provider<CategoryRepository>((ref) {
 class ExpenseCategoriesNotifier extends Notifier<List<CategoryRecord>> {
   @override
   List<CategoryRecord> build() {
-    return ref.watch(categoryRepositoryProvider).getAll(TransactionType.expense);
+    return ref
+        .watch(categoryRepositoryProvider)
+        .getAll(TransactionType.expense);
   }
 
   void refresh() {
-    state = ref.read(categoryRepositoryProvider).getAll(TransactionType.expense);
+    state = ref
+        .read(categoryRepositoryProvider)
+        .getAll(TransactionType.expense);
   }
 }
 
@@ -32,11 +36,13 @@ class IncomeCategoriesNotifier extends Notifier<List<CategoryRecord>> {
 
 final expenseCategoriesProvider =
     NotifierProvider<ExpenseCategoriesNotifier, List<CategoryRecord>>(
-        ExpenseCategoriesNotifier.new);
+      ExpenseCategoriesNotifier.new,
+    );
 
 final incomeCategoriesProvider =
     NotifierProvider<IncomeCategoriesNotifier, List<CategoryRecord>>(
-        IncomeCategoriesNotifier.new);
+      IncomeCategoriesNotifier.new,
+    );
 
 /// Maps a category *name* to its icon id.
 ///

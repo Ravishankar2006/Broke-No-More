@@ -41,10 +41,10 @@ class AnimatedProgressBar extends StatelessWidget {
   final bool isOver;
 
   double get _height => switch (variant) {
-        ProgressVariant.xp => 14,
-        ProgressVariant.budget => 10,
-        ProgressVariant.quest => 8,
-      };
+    ProgressVariant.xp => 14,
+    ProgressVariant.budget => 10,
+    ProgressVariant.quest => 8,
+  };
 
   @override
   Widget build(BuildContext context) {

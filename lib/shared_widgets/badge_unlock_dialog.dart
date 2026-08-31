@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/theme/app_dimens.dart';
 import '../core/theme/app_elevation.dart';
+import '../core/theme/app_motion.dart';
 import '../core/theme/app_semantic_colors.dart';
 import '../core/utils/badge_engine.dart';
 import '../core/utils/badge_icons.dart';
@@ -30,7 +31,7 @@ Future<void> showBadgeUnlockDialog(
 
       return CelebrationBurst(
         child: AlertDialog(
-          contentPadding: EdgeInsets.fromLTRB(
+          contentPadding: const EdgeInsets.fromLTRB(
             Spacing.xl,
             Spacing.xl,
             Spacing.xl,
@@ -42,15 +43,17 @@ Future<void> showBadgeUnlockDialog(
               const CelebrationAnimation(
                 asset: CelebrationAssets.badgeUnlock,
                 fallbackIcon: Icons.workspace_premium,
-                size: 96,
+                size: MedallionSize.dialogPrimary,
               ),
-              SizedBox(height: Spacing.sm),
+              const SizedBox(height: Spacing.sm),
               Text(
-                multiple ? '${badges.length} badges unlocked!' : 'Badge unlocked!',
+                multiple
+                    ? '${badges.length} badges unlocked!'
+                    : 'Badge unlocked!',
                 style: theme.textTheme.headlineSmall,
                 textAlign: TextAlign.center,
               ),
-              SizedBox(height: Spacing.lg),
+              const SizedBox(height: Spacing.lg),
               for (var i = 0; i < badges.length; i++)
                 Padding(
                   padding: EdgeInsets.only(
@@ -60,10 +63,10 @@ Future<void> showBadgeUnlockDialog(
                     children: [
                       BounceIn(
                         // Stagger so several unlocks land one after another.
-                        delay: Duration(milliseconds: 120 * i),
+                        delay: AppMotion.celebrationStagger * i,
                         child: Container(
-                          width: 56,
-                          height: 56,
+                          width: MedallionSize.avatarPicker,
+                          height: MedallionSize.avatarPicker,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             gradient: AppGradients.xp(theme.brightness),
@@ -72,11 +75,11 @@ Future<void> showBadgeUnlockDialog(
                           child: Icon(
                             badgeIcon(badges[i].iconId),
                             color: semantics.onGold,
-                            size: 28,
+                            size: IconSize.xl,
                           ),
                         ),
                       ),
-                      SizedBox(width: Spacing.lg),
+                      const SizedBox(width: Spacing.lg),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -85,7 +88,7 @@ Future<void> showBadgeUnlockDialog(
                               badges[i].name,
                               style: theme.textTheme.titleSmall,
                             ),
-                            SizedBox(height: Spacing.xxs),
+                            const SizedBox(height: Spacing.xxs),
                             Text(
                               badges[i].description,
                               style: theme.textTheme.bodySmall,
@@ -99,7 +102,7 @@ Future<void> showBadgeUnlockDialog(
               // Only shown when the caller supplies the real total — a
               // progress line that guessed would be worse than none.
               if (totalUnlocked != null) ...[
-                SizedBox(height: Spacing.lg),
+                const SizedBox(height: Spacing.lg),
                 Text(
                   '$totalUnlocked of ${kBadgeCatalog.length} badges earned',
                   style: theme.textTheme.labelSmall?.copyWith(

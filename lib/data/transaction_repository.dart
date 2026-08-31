@@ -105,8 +105,48 @@ class TransactionRepository {
     return _box.putAll({for (final t in transactions) t.id: t});
   }
 
+  /// Wipes every transaction — the JSON backup restore's write path, which
+  /// replaces the box wholesale rather than merging.
+  Future<void> clear() => _box.clear();
+
   List<Transaction> forDay(DateTime day) {
     return _box.values.where((t) => isSameDay(t.timestamp, day)).toList();
+  }
+
+  /// How many rows currently carry [category] — `category` is a
+  /// denormalized string (PRD design), so a rename in Profile > Manage
+  /// categories otherwise leaves every past row still pointing at the old
+  /// name. Used to ask "rename in N existing transactions too?" before
+  /// [renameCategory] actually rewrites them.
+  int countForCategory(String category) =>
+      _box.values.where((t) => t.category == category).length;
+
+  /// Rewrites every row's `category` from [oldName] to [newName]. Returns
+  /// the number of rows touched. A fresh [Transaction] per row, not
+  /// in-place mutation — same reasoning as [update]: box-bound instances
+  /// are shared with `transactionsProvider`'s state list.
+  Future<int> renameCategory(String oldName, String newName) async {
+    final matching = _box.values
+        .where((t) => t.category == oldName)
+        .toList(growable: false);
+    if (matching.isEmpty) return 0;
+
+    final renamed = [
+      for (final t in matching)
+        Transaction(
+          id: t.id,
+          amount: t.amount,
+          type: t.type,
+          category: newName,
+          note: t.note,
+          timestamp: t.timestamp,
+          loggedAt: t.loggedAt,
+          isQuickLog: t.isQuickLog,
+          xpAwarded: t.xpAwarded,
+        ),
+    ];
+    await putAll(renamed);
+    return renamed.length;
   }
 
   int countForDay(DateTime day) => forDay(day).length;
@@ -128,7 +168,9 @@ class TransactionRepository {
   /// Total expense per category over the given transactions.
   Map<String, double> totalsByCategory(List<Transaction> transactions) {
     final totals = <String, double>{};
-    for (final t in transactions.where((t) => t.type == TransactionType.expense)) {
+    for (final t in transactions.where(
+      (t) => t.type == TransactionType.expense,
+    )) {
       totals[t.category] = (totals[t.category] ?? 0) + t.amount;
     }
     return totals;

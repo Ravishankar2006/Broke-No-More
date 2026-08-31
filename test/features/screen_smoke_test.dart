@@ -53,13 +53,13 @@ void main() {
       Hive.registerAdapter(RecurringTransactionAdapter());
     }
 
-    final transactions =
-        await Hive.openBox<Transaction>(HiveBoxes.transactions);
+    final transactions = await Hive.openBox<Transaction>(
+      HiveBoxes.transactions,
+    );
     final profiles = await Hive.openBox<UserProfile>(HiveBoxes.profile);
     await Hive.openBox<Quest>(HiveBoxes.quests);
     await Hive.openBox<Badge>(HiveBoxes.badges);
-    final categories =
-        await Hive.openBox<CategoryRecord>(HiveBoxes.categories);
+    final categories = await Hive.openBox<CategoryRecord>(HiveBoxes.categories);
     await Hive.openBox<RecurringTransaction>(HiveBoxes.recurringTransactions);
     await Hive.openBox<dynamic>(HiveBoxes.appState);
 
@@ -79,21 +79,25 @@ void main() {
     ];
     var order = 0;
     for (final (name, iconId) in expenseCategories) {
-      await categories.add(CategoryRecord(
-        id: 'e$order',
-        name: name,
-        iconId: iconId,
-        type: TransactionType.expense,
-        sortOrder: order++,
-      ));
+      await categories.add(
+        CategoryRecord(
+          id: 'e$order',
+          name: name,
+          iconId: iconId,
+          type: TransactionType.expense,
+          sortOrder: order++,
+        ),
+      );
     }
-    await categories.add(CategoryRecord(
-      id: 'i0',
-      name: 'Allowance',
-      iconId: 'wallet',
-      type: TransactionType.income,
-      sortOrder: 0,
-    ));
+    await categories.add(
+      CategoryRecord(
+        id: 'i0',
+        name: 'Allowance',
+        iconId: 'wallet',
+        type: TransactionType.income,
+        sortOrder: 0,
+      ),
+    );
 
     final now = DateTime.now();
     await profiles.put(
@@ -189,56 +193,52 @@ void main() {
 
   for (final sizeEntry in sizes.entries) {
     for (final screenEntry in screens.entries) {
-      testWidgets(
-        '${screenEntry.key} lays out on ${sizeEntry.key}',
-        (tester) async {
-          await pumpScreen(
-            tester,
-            screenEntry.value(),
-            size: sizeEntry.value,
-            textScale: 1.0,
-            brightness: Brightness.light,
-          );
-        },
-      );
+      testWidgets('${screenEntry.key} lays out on ${sizeEntry.key}', (
+        tester,
+      ) async {
+        await pumpScreen(
+          tester,
+          screenEntry.value(),
+          size: sizeEntry.value,
+          textScale: 1.0,
+          brightness: Brightness.light,
+        );
+      });
     }
   }
 
   // Large text is where fixed-height rows and chips typically break.
   for (final screenEntry in screens.entries) {
-    testWidgets(
-      '${screenEntry.key} lays out at 1.5x text scale',
-      (tester) async {
-        await pumpScreen(
-          tester,
-          screenEntry.value(),
-          size: const Size(412, 915),
-          textScale: 1.5,
-          brightness: Brightness.light,
-        );
-      },
-    );
+    testWidgets('${screenEntry.key} lays out at 1.5x text scale', (
+      tester,
+    ) async {
+      await pumpScreen(
+        tester,
+        screenEntry.value(),
+        size: const Size(412, 915),
+        textScale: 1.5,
+        brightness: Brightness.light,
+      );
+    });
   }
 
   // Dark mode exercises the second half of every ThemeExtension token,
   // including the new shadow and gradient treatments.
   for (final screenEntry in screens.entries) {
-    testWidgets(
-      '${screenEntry.key} lays out in dark mode',
-      (tester) async {
-        await pumpScreen(
-          tester,
-          screenEntry.value(),
-          size: const Size(412, 915),
-          textScale: 1.0,
-          brightness: Brightness.dark,
-        );
-      },
-    );
+    testWidgets('${screenEntry.key} lays out in dark mode', (tester) async {
+      await pumpScreen(
+        tester,
+        screenEntry.value(),
+        size: const Size(412, 915),
+        textScale: 1.0,
+        brightness: Brightness.dark,
+      );
+    });
   }
 
-  testWidgets('Home renders its first-run empty state with no transactions',
-      (tester) async {
+  testWidgets('Home renders its first-run empty state with no transactions', (
+    tester,
+  ) async {
     // Hive.clear() does a real dart:io write, which never resolves on
     // flutter_test's fake clock unless it runs inside runAsync.
     await tester.runAsync(() async {

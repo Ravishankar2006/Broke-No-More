@@ -14,13 +14,9 @@ import 'celebration_effects.dart';
 /// changed without the user seeing it move. Now the level sits in a medallion,
 /// the bar tweens and glows, and the XP count rolls up.
 class XpBar extends StatelessWidget {
-  const XpBar({super.key, required this.progress, this.compact = false});
+  const XpBar({super.key, required this.progress});
 
   final LevelProgress progress;
-
-  /// Drops the medallion and the "to next level" line — for tight contexts
-  /// like a list row or a dense header.
-  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -28,42 +24,10 @@ class XpBar extends StatelessWidget {
     final semantics = context.semantics;
     final remaining = progress.xpForNextLevel - progress.xpIntoLevel;
 
-    if (compact) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Flexible(
-                child: Text(
-                  'Level ${progress.level}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.labelLarge,
-                ),
-              ),
-              SizedBox(width: Spacing.sm),
-              Flexible(
-                child: Text(
-                  '${progress.xpIntoLevel} / ${progress.xpForNextLevel} XP',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodySmall,
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: Spacing.sm),
-          AnimatedProgressBar(value: progress.fraction),
-        ],
-      );
-    }
-
     return Row(
       children: [
         _LevelMedallion(level: progress.level),
-        SizedBox(width: Spacing.lg),
+        const SizedBox(width: Spacing.lg),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -82,7 +46,7 @@ class XpBar extends StatelessWidget {
                       style: theme.textTheme.titleMedium,
                     ),
                   ),
-                  SizedBox(width: Spacing.sm),
+                  const SizedBox(width: Spacing.sm),
                   Flexible(
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -109,9 +73,9 @@ class XpBar extends StatelessWidget {
                   ),
                 ],
               ),
-              SizedBox(height: Spacing.sm),
+              const SizedBox(height: Spacing.sm),
               AnimatedProgressBar(value: progress.fraction),
-              SizedBox(height: Spacing.sm),
+              const SizedBox(height: Spacing.sm),
               Text(
                 remaining > 0
                     ? '$remaining XP to level ${progress.level + 1}'
@@ -139,8 +103,8 @@ class _LevelMedallion extends StatelessWidget {
     final semantics = context.semantics;
 
     return Container(
-      width: 52,
-      height: 52,
+      width: MedallionSize.xpMedallion,
+      height: MedallionSize.xpMedallion,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         gradient: AppGradients.xp(theme.brightness),

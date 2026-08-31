@@ -9,6 +9,7 @@ import '../../core/theme/app_dimens.dart';
 import '../../core/theme/app_elevation.dart';
 import '../../core/theme/app_motion.dart';
 import '../../core/theme/app_semantic_colors.dart';
+import '../../core/utils/currency_catalog.dart';
 import '../../providers/profile_provider.dart';
 import '../../shared_widgets/app_avatar.dart';
 import '../profile/profile_screen.dart' show kAvatarChoices;
@@ -39,6 +40,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   int _page = 0;
   String _selectedAvatar = kAvatarChoices.first;
+  String _selectedCurrencyCode = kDefaultCurrencyCode;
   bool _submitted = false;
   bool _saving = false;
 
@@ -60,7 +62,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   String? get _nameError {
     if (!_submitted) return null;
-    return _nameController.text.trim().isEmpty ? 'We need a name to start' : null;
+    return _nameController.text.trim().isEmpty
+        ? 'We need a name to start'
+        : null;
   }
 
   void _next() {
@@ -91,12 +95,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     // create a blank-named profile. Re-check here, on the actual write path.
     if (_nameController.text.trim().isEmpty) {
       setState(() => _submitted = true);
-      HapticFeedback.heavyImpact();
-      unawaited(_pageController.animateToPage(
-        1,
-        duration: AppMotion.slow,
-        curve: AppMotion.standardCurve,
-      ));
+      unawaited(HapticFeedback.heavyImpact());
+      unawaited(
+        _pageController.animateToPage(
+          1,
+          duration: AppMotion.slow,
+          curve: AppMotion.standardCurve,
+        ),
+      );
       return;
     }
 
@@ -109,11 +115,15 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     try {
       // No explicit navigation here — BrokeNoMoreApp watches profileProvider
       // and swaps MaterialApp.home to HomeShell reactively once it's set.
-      await ref.read(profileProvider.notifier).createProfile(
+      await ref
+          .read(profileProvider.notifier)
+          .createProfile(
             name: _nameController.text.trim(),
             avatarId: _selectedAvatar,
-            monthlyBudget:
-                budgetText.isEmpty ? null : double.tryParse(budgetText),
+            monthlyBudget: budgetText.isEmpty
+                ? null
+                : double.tryParse(budgetText),
+            currencyCode: _selectedCurrencyCode,
           );
     } catch (_) {
       if (!mounted) return;
@@ -150,12 +160,19 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       setState(() => _selectedAvatar = emoji);
                     },
                   ),
-                  _BudgetPage(controller: _budgetController),
+                  _BudgetPage(
+                    controller: _budgetController,
+                    currencyCode: _selectedCurrencyCode,
+                    onCurrencyChanged: (code) {
+                      HapticFeedback.selectionClick();
+                      setState(() => _selectedCurrencyCode = code);
+                    },
+                  ),
                 ],
               ),
             ),
             Padding(
-              padding: EdgeInsets.all(Spacing.xl),
+              padding: const EdgeInsets.all(Spacing.xl),
               child: Column(
                 children: [
                   SizedBox(
@@ -164,8 +181,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       onPressed: _saving ? null : _next,
                       child: _saving
                           ? SizedBox(
-                              height: 20,
-                              width: 20,
+                              height: IconSize.md,
+                              width: IconSize.md,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
                                 valueColor: AlwaysStoppedAnimation<Color>(
@@ -173,11 +190,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                                 ),
                               ),
                             )
-                          : Text(_page == _pageCount - 1 ? 'Start' : 'Continue'),
+                          : Text(
+                              _page == _pageCount - 1 ? 'Start' : 'Continue',
+                            ),
                     ),
                   ),
                   if (_page == _pageCount - 1) ...[
-                    SizedBox(height: Spacing.sm),
+                    const SizedBox(height: Spacing.sm),
                     Text(
                       'You can change any of this later',
                       style: theme.textTheme.bodySmall,
@@ -205,7 +224,7 @@ class _ProgressDots extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
 
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: Spacing.lg),
+      padding: const EdgeInsets.symmetric(vertical: Spacing.lg),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -213,7 +232,7 @@ class _ProgressDots extends StatelessWidget {
             AnimatedContainer(
               duration: AppMotion.standard,
               curve: AppMotion.standardCurve,
-              margin: EdgeInsets.symmetric(horizontal: Spacing.xs),
+              margin: const EdgeInsets.symmetric(horizontal: Spacing.xs),
               width: i == current ? 28 : 8,
               height: 8,
               decoration: BoxDecoration(
@@ -239,19 +258,19 @@ class _WelcomePage extends StatelessWidget {
     return _Page(
       children: [
         Container(
-          width: 120,
-          height: 120,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: AppGradients.xp(theme.brightness),
-            boxShadow: AppShadows.gold(theme.brightness),
-          ),
-          child: Icon(
-            Icons.savings_rounded,
-            size: 60,
-            color: semantics.onGold,
-          ),
-        )
+              width: MedallionSize.onboardingHero,
+              height: MedallionSize.onboardingHero,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: AppGradients.xp(theme.brightness),
+                boxShadow: AppShadows.gold(theme.brightness),
+              ),
+              child: Icon(
+                Icons.savings_rounded,
+                size: IconSize.heroLg,
+                color: semantics.onGold,
+              ),
+            )
             .animate()
             .scale(
               duration: AppMotion.celebrate,
@@ -260,13 +279,13 @@ class _WelcomePage extends StatelessWidget {
               end: const Offset(1, 1),
             )
             .fadeIn(),
-        SizedBox(height: Spacing.xxl),
+        const SizedBox(height: Spacing.xxl),
         Text(
           'Broke No More',
           textAlign: TextAlign.center,
           style: theme.textTheme.headlineMedium,
         ),
-        SizedBox(height: Spacing.md),
+        const SizedBox(height: Spacing.md),
         Text(
           'Track what you spend, earn XP for showing up, and build a streak '
           "you won't want to break.",
@@ -275,7 +294,7 @@ class _WelcomePage extends StatelessWidget {
             color: theme.colorScheme.onSurfaceVariant,
           ),
         ),
-        SizedBox(height: Spacing.xxl),
+        const SizedBox(height: Spacing.xxl),
         const _MechanicRow(
           icon: Icons.bolt,
           title: 'Earn XP',
@@ -313,25 +332,25 @@ class _MechanicRow extends StatelessWidget {
     final semantics = context.semantics;
 
     return Padding(
-      padding: EdgeInsets.only(bottom: Spacing.lg),
+      padding: const EdgeInsets.only(bottom: Spacing.lg),
       child: Row(
         children: [
           Container(
-            width: 40,
-            height: 40,
+            width: MedallionSize.transactionChip,
+            height: MedallionSize.transactionChip,
             decoration: BoxDecoration(
               color: semantics.goldSurface,
               borderRadius: BorderRadius.circular(AppRadius.md),
             ),
-            child: Icon(icon, size: 20, color: semantics.goldInk),
+            child: Icon(icon, size: IconSize.md, color: semantics.goldInk),
           ),
-          SizedBox(width: Spacing.lg),
+          const SizedBox(width: Spacing.lg),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(title, style: theme.textTheme.titleSmall),
-                SizedBox(height: Spacing.xxs),
+                const SizedBox(height: Spacing.xxs),
                 Text(
                   subtitle,
                   style: theme.textTheme.bodySmall?.copyWith(
@@ -367,9 +386,8 @@ class _IdentityPage extends StatelessWidget {
     return _Page(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('What should we call you?',
-            style: theme.textTheme.headlineSmall),
-        SizedBox(height: Spacing.sm),
+        Text('What should we call you?', style: theme.textTheme.headlineSmall),
+        const SizedBox(height: Spacing.sm),
         Text(
           'Stays on this device — there is no account and nothing leaves your '
           'phone.',
@@ -377,7 +395,7 @@ class _IdentityPage extends StatelessWidget {
             color: theme.colorScheme.onSurfaceVariant,
           ),
         ),
-        SizedBox(height: Spacing.xl),
+        const SizedBox(height: Spacing.xl),
         TextField(
           controller: nameController,
           textCapitalization: TextCapitalization.words,
@@ -386,9 +404,9 @@ class _IdentityPage extends StatelessWidget {
             errorText: nameError,
           ),
         ),
-        SizedBox(height: Spacing.xxl),
+        const SizedBox(height: Spacing.xxl),
         Text('Pick an avatar', style: theme.textTheme.titleSmall),
-        SizedBox(height: Spacing.lg),
+        const SizedBox(height: Spacing.lg),
         Wrap(
           spacing: Spacing.lg,
           runSpacing: Spacing.lg,
@@ -396,7 +414,7 @@ class _IdentityPage extends StatelessWidget {
             for (final emoji in kAvatarChoices)
               AppAvatar(
                 emoji: emoji,
-                size: 64,
+                size: MedallionSize.avatarPickerLg,
                 selected: emoji == selectedAvatar,
                 onTap: () => onAvatarSelected(emoji),
               ),
@@ -408,9 +426,15 @@ class _IdentityPage extends StatelessWidget {
 }
 
 class _BudgetPage extends StatelessWidget {
-  const _BudgetPage({required this.controller});
+  const _BudgetPage({
+    required this.controller,
+    required this.currencyCode,
+    required this.onCurrencyChanged,
+  });
 
   final TextEditingController controller;
+  final String currencyCode;
+  final ValueChanged<String> onCurrencyChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -421,7 +445,7 @@ class _BudgetPage extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('Set a monthly budget', style: theme.textTheme.headlineSmall),
-        SizedBox(height: Spacing.sm),
+        const SizedBox(height: Spacing.sm),
         Text(
           'Optional. If you set one, staying under your daily share earns bonus '
           'XP.',
@@ -429,19 +453,34 @@ class _BudgetPage extends StatelessWidget {
             color: theme.colorScheme.onSurfaceVariant,
           ),
         ),
-        SizedBox(height: Spacing.xl),
+        const SizedBox(height: Spacing.xl),
+        DropdownButtonFormField<String>(
+          initialValue: currencyCode,
+          decoration: const InputDecoration(labelText: 'Currency'),
+          items: [
+            for (final currency in kSupportedCurrencies)
+              DropdownMenuItem(
+                value: currency.code,
+                child: Text('${currency.symbol} ${currency.name}'),
+              ),
+          ],
+          onChanged: (code) {
+            if (code != null) onCurrencyChanged(code);
+          },
+        ),
+        const SizedBox(height: Spacing.lg),
         TextField(
           controller: controller,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             labelText: 'Monthly budget',
-            prefixText: '₹ ',
+            prefixText: '${currencyInfoFor(currencyCode).symbol} ',
             hintText: 'e.g. 8000',
           ),
         ),
-        SizedBox(height: Spacing.xl),
+        const SizedBox(height: Spacing.xl),
         Container(
-          padding: EdgeInsets.all(Spacing.lg),
+          padding: const EdgeInsets.all(Spacing.lg),
           decoration: BoxDecoration(
             color: semantics.goldSurface,
             borderRadius: BorderRadius.circular(AppRadius.lg),
@@ -450,7 +489,7 @@ class _BudgetPage extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Icon(Icons.bolt, color: semantics.goldInk),
-              SizedBox(width: Spacing.md),
+              const SizedBox(width: Spacing.md),
               Expanded(
                 child: Text(
                   'Log within 30 minutes of spending for a quick-log bonus. '
@@ -481,14 +520,11 @@ class _Page extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: EdgeInsets.symmetric(
+      padding: const EdgeInsets.symmetric(
         horizontal: Spacing.xl,
         vertical: Spacing.lg,
       ),
-      child: Column(
-        crossAxisAlignment: crossAxisAlignment,
-        children: children,
-      ),
+      child: Column(crossAxisAlignment: crossAxisAlignment, children: children),
     );
   }
 }

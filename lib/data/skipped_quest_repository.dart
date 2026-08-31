@@ -37,4 +37,9 @@ class SkippedQuestRepository {
   }
 
   Future<void> clear() => _box.delete(_kSkippedQuestTitles);
+
+  /// Overwrites the whole set — the JSON backup restore's write path,
+  /// which has a complete replacement set rather than one title to add.
+  Future<void> replaceAll(Set<String> titles) =>
+      _box.put(_kSkippedQuestTitles, titles.toList());
 }

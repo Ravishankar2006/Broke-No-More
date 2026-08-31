@@ -77,6 +77,26 @@ class RecurringTransactionRepository {
 
   Future<void> delete(String id) => _box.delete(id);
 
+  /// How many rules currently carry [category] — same denormalized-name
+  /// problem as `TransactionRepository.countForCategory`: a rule left
+  /// pointing at a renamed category would keep materializing transactions
+  /// under the old name forever.
+  int countForCategory(String category) =>
+      _box.values.where((r) => r.category == category).length;
+
+  /// Rewrites every rule's `category` from [oldName] to [newName]. Returns
+  /// the number of rules touched.
+  Future<int> renameCategory(String oldName, String newName) async {
+    final matching = _box.values
+        .where((r) => r.category == oldName)
+        .toList(growable: false);
+    for (final rule in matching) {
+      rule.category = newName;
+      await rule.save();
+    }
+    return matching.length;
+  }
+
   /// The one checkpoint (run at app startup, no backend to run this on a
   /// schedule) for turning due recurring rules into real transactions.
   ///
@@ -101,21 +121,23 @@ class RecurringTransactionRepository {
       );
 
       for (final due in result.dueDates) {
-        newTransactions.add(Transaction(
-          id: _uuid.v4(),
-          amount: rule.amount,
-          type: rule.type,
-          category: rule.category,
-          note: rule.note,
-          timestamp: due,
-          // The moment this was actually recorded, not the (possibly
-          // long-past) date it conceptually occurred on — same rule
-          // TransactionRepository.update follows for a backdated edit.
-          loggedAt: effectiveNow,
-          // Never a quick log: these weren't logged within 30 minutes of
-          // the expense by definition of being auto-generated.
-          isQuickLog: false,
-        ));
+        newTransactions.add(
+          Transaction(
+            id: _uuid.v4(),
+            amount: rule.amount,
+            type: rule.type,
+            category: rule.category,
+            note: rule.note,
+            timestamp: due,
+            // The moment this was actually recorded, not the (possibly
+            // long-past) date it conceptually occurred on — same rule
+            // TransactionRepository.update follows for a backdated edit.
+            loggedAt: effectiveNow,
+            // Never a quick log: these weren't logged within 30 minutes of
+            // the expense by definition of being auto-generated.
+            isQuickLog: false,
+          ),
+        );
       }
 
       final reachedEnd =
@@ -133,5 +155,15 @@ class RecurringTransactionRepository {
     for (final rule in touchedRules) {
       await rule.save();
     }
+  }
+
+  /// Wipes every rule — the JSON backup restore's write path, which
+  /// replaces the box wholesale rather than merging.
+  Future<void> clear() => _box.clear();
+
+  /// Writes every rule in [rules] by id, overwriting any existing row with
+  /// the same id. Same reasoning as `TransactionRepository.putAll`.
+  Future<void> putAll(Iterable<RecurringTransaction> rules) {
+    return _box.putAll({for (final r in rules) r.id: r});
   }
 }

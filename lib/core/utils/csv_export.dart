@@ -2,11 +2,8 @@ import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:uuid/uuid.dart';
 
 import '../../models/transaction.dart';
-
-const _uuid = Uuid();
 
 /// Column order for both [transactionsToCsv] and [parseTransactionsCsv] —
 /// the single definition both share, so writer and reader can't drift.
@@ -161,21 +158,46 @@ Transaction _rowToTransaction(List<String> row, Map<String, int> col) {
   final id = field('id').trim();
   final note = field('note');
   final isQuickLog = field('isQuickLog').trim().toLowerCase() == 'true';
+  final resolvedNote = note.isEmpty ? null : note;
 
   return Transaction(
-    // A blank id (e.g. a hand-built CSV) gets a fresh one rather than
-    // failing the row — the id only matters for de-duplicating against
-    // what's already on the device, which an id-less row can't collide with
-    // anyway.
-    id: id.isEmpty ? _uuid.v4() : id,
+    // A blank id (e.g. a hand-built CSV) used to get a fresh random uuid —
+    // re-importing the very same file twice then created two distinct
+    // rows instead of recognising the second import as a repeat, since a
+    // random id can never collide with anything already on the device. A
+    // content hash is stable across imports of unchanged rows, so the
+    // normal existing-id conflict check downstream (profile_screen.dart)
+    // can actually catch the repeat.
+    id: id.isEmpty
+        ? _contentHashId(
+            amount: amount,
+            type: type,
+            category: category,
+            timestamp: timestamp,
+            note: resolvedNote,
+          )
+        : id,
     amount: amount,
     type: type,
     category: category,
-    note: note.isEmpty ? null : note,
+    note: resolvedNote,
     timestamp: timestamp,
     loggedAt: loggedAt,
     isQuickLog: isQuickLog,
   );
+}
+
+String _contentHashId({
+  required double amount,
+  required TransactionType type,
+  required String category,
+  required DateTime timestamp,
+  required String? note,
+}) {
+  final key =
+      '$amount|${type.name}|$category|'
+      '${timestamp.toIso8601String()}|${note ?? ''}';
+  return 'csv-${key.hashCode.toUnsigned(32).toRadixString(16)}';
 }
 
 /// Hand-rolled RFC 4180 parser: tracks quote state across the *whole*

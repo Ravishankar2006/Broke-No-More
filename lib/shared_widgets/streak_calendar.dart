@@ -4,7 +4,6 @@ import '../core/theme/app_dimens.dart';
 import '../core/theme/app_motion.dart';
 import '../core/theme/app_semantic_colors.dart';
 import '../core/utils/date_helpers.dart';
-import '../models/transaction.dart';
 
 /// How a day in the calendar should be drawn.
 enum _DayState { logged, frozen, missed, today, future }
@@ -22,12 +21,16 @@ enum _DayState { logged, frozen, missed, today, future }
 class StreakCalendar extends StatelessWidget {
   const StreakCalendar({
     super.key,
-    required this.transactions,
+    required this.loggedDays,
     this.daysToShow = 7,
     this.onGold = false,
   });
 
-  final List<Transaction> transactions;
+  /// Calendar days (midnight-truncated) with at least one logged
+  /// transaction — see `loggedDaysProvider`. Taking the pre-computed set
+  /// rather than the raw transaction list means this widget never rescans
+  /// the whole history just to answer a handful of day-membership checks.
+  final Set<DateTime> loggedDays;
   final int daysToShow;
 
   /// Set when the calendar sits on a gold hero surface, where the normal
@@ -39,7 +42,6 @@ class StreakCalendar extends StatelessWidget {
     final theme = Theme.of(context);
     final semantics = context.semantics;
     final today = startOfDay(DateTime.now());
-    final loggedDays = transactions.map((t) => startOfDay(t.timestamp)).toSet();
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -49,29 +51,37 @@ class StreakCalendar extends StatelessWidget {
         final isToday = day == today;
 
         return Expanded(
-          child: Column(
-            children: [
-              _DayDot(
-                state: state,
-                isToday: isToday,
-                onGold: onGold,
-                // Stagger the fill so the row assembles left-to-right rather
-                // than appearing all at once.
-                delay: AppMotion.staggerDelay(i),
-              ),
-              SizedBox(height: Spacing.xs),
-              Text(
-                _weekdayLabel(day.weekday),
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: onGold
-                      ? semantics.onGold.withValues(alpha: isToday ? 1 : 0.65)
-                      : isToday
-                          ? theme.colorScheme.onSurface
-                          : theme.colorScheme.onSurfaceVariant,
-                  fontWeight: isToday ? FontWeight.w800 : FontWeight.w600,
+          child: Semantics(
+            // The dot's colour/icon are the only way this state is
+            // conveyed, so a screen reader gets nothing without a label.
+            label:
+                '${_weekdayLabel(day.weekday)}${isToday ? ', today' : ''}, '
+                '${_stateLabel(state)}',
+            excludeSemantics: true,
+            child: Column(
+              children: [
+                _DayDot(
+                  state: state,
+                  isToday: isToday,
+                  onGold: onGold,
+                  // Stagger the fill so the row assembles left-to-right
+                  // rather than appearing all at once.
+                  delay: AppMotion.staggerDelay(i),
                 ),
-              ),
-            ],
+                const SizedBox(height: Spacing.xs),
+                Text(
+                  _weekdayLabel(day.weekday),
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: onGold
+                        ? semantics.onGold.withValues(alpha: isToday ? 1 : 0.65)
+                        : isToday
+                        ? theme.colorScheme.onSurface
+                        : theme.colorScheme.onSurfaceVariant,
+                    fontWeight: isToday ? FontWeight.w800 : FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       }),
@@ -102,6 +112,14 @@ class StreakCalendar extends StatelessWidget {
     const labels = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
     return labels[weekday - 1];
   }
+
+  static String _stateLabel(_DayState state) => switch (state) {
+    _DayState.logged => 'logged',
+    _DayState.frozen => 'covered by a streak freeze',
+    _DayState.today => 'not logged yet',
+    _DayState.missed => 'missed',
+    _DayState.future => 'upcoming',
+  };
 }
 
 class _DayDot extends StatelessWidget {
@@ -124,22 +142,24 @@ class _DayDot extends StatelessWidget {
 
     final fill = switch (state) {
       _DayState.logged => onGold ? semantics.onGold : semantics.streak,
-      _DayState.frozen => onGold
-          ? semantics.onGold.withValues(alpha: 0.25)
-          : cs.primary.withValues(alpha: 0.18),
-      _DayState.today ||
-      _DayState.missed ||
-      _DayState.future =>
-        onGold ? semantics.onGold.withValues(alpha: 0.12) : semantics.streakTrack,
+      _DayState.frozen =>
+        onGold
+            ? semantics.onGold.withValues(alpha: 0.25)
+            : cs.primary.withValues(alpha: 0.18),
+      _DayState.today || _DayState.missed || _DayState.future =>
+        onGold
+            ? semantics.onGold.withValues(alpha: 0.12)
+            : semantics.streakTrack,
     };
 
     final borderColor = switch (state) {
       _DayState.logged => null,
       _DayState.frozen => onGold ? semantics.onGold : cs.primary,
       _DayState.today => onGold ? semantics.onGold : semantics.streak,
-      _ => onGold
-          ? semantics.onGold.withValues(alpha: 0.3)
-          : semantics.streakDotBorder,
+      _ =>
+        onGold
+            ? semantics.onGold.withValues(alpha: 0.3)
+            : semantics.streakDotBorder,
     };
 
     final icon = switch (state) {
@@ -162,8 +182,8 @@ class _DayDot extends StatelessWidget {
       builder: (context, scale, child) =>
           Transform.scale(scale: scale, child: child),
       child: Container(
-        width: 30,
-        height: 30,
+        width: MedallionSize.dayDot,
+        height: MedallionSize.dayDot,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: fill,
@@ -175,7 +195,9 @@ class _DayDot extends StatelessWidget {
                   width: isToday ? 2 : 1,
                 ),
         ),
-        child: icon == null ? null : Icon(icon, color: iconColor, size: 16),
+        child: icon == null
+            ? null
+            : Icon(icon, color: iconColor, size: IconSize.sm),
       ),
     );
   }

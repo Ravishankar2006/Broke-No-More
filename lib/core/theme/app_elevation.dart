@@ -13,9 +13,8 @@ import 'app_colors.dart';
 ///    (`indigo950`) so they read as the surface sitting on *this* canvas, not as
 ///    a generic drop shadow. Gold surfaces get a gold-tinted glow instead.
 /// 2. **Dark mode is not the same shadow at higher opacity.** On `#0E1117` a
-///    wide soft shadow is invisible, so dark uses tighter, deeper shadows plus a
-///    1px top highlight to define the upper edge — the way real materials catch
-///    light.
+///    wide soft shadow is invisible, so dark uses tighter, deeper shadows —
+///    the way real materials catch light.
 ///
 /// Every getter takes [Brightness] so callers can't accidentally use the light
 /// treatment on a dark canvas.
@@ -44,52 +43,6 @@ abstract class AppShadows {
         color: Color(0x0A1E1B4B), // indigo950 @ 0.04
         blurRadius: 3,
         offset: Offset(0, 1),
-      ),
-    ];
-  }
-
-  /// Hero cards, the FAB, pressed/active states — anything that should read as
-  /// sitting clearly above the canvas.
-  static List<BoxShadow> raised(Brightness brightness) {
-    if (_isDark(brightness)) {
-      return const [
-        BoxShadow(
-          color: Color(0x8A000000),
-          blurRadius: 20,
-          offset: Offset(0, 8),
-        ),
-      ];
-    }
-    return const [
-      BoxShadow(
-        color: Color(0x1F1E1B4B), // indigo950 @ 0.12
-        blurRadius: 28,
-        offset: Offset(0, 10),
-      ),
-      BoxShadow(
-        color: Color(0x0F1E1B4B), // indigo950 @ 0.06
-        blurRadius: 6,
-        offset: Offset(0, 2),
-      ),
-    ];
-  }
-
-  /// Bottom sheets, dialogs, menus — surfaces floating over dimmed content.
-  static List<BoxShadow> overlay(Brightness brightness) {
-    if (_isDark(brightness)) {
-      return const [
-        BoxShadow(
-          color: Color(0xA6000000),
-          blurRadius: 32,
-          offset: Offset(0, -4),
-        ),
-      ];
-    }
-    return const [
-      BoxShadow(
-        color: Color(0x241E1B4B), // indigo950 @ 0.14
-        blurRadius: 40,
-        offset: Offset(0, -6),
       ),
     ];
   }
@@ -124,16 +77,6 @@ abstract class AppShadows {
         offset: Offset(0, 2),
       ),
     ];
-  }
-
-  /// A 1px inner highlight along the top edge. Dark-mode surfaces need this to
-  /// separate from the canvas, since shadow alone does almost nothing on
-  /// `#0E1117`. Returns null in light mode, where it would just look like grime.
-  static Border? topHighlight(Brightness brightness) {
-    if (!_isDark(brightness)) return null;
-    return const Border(
-      top: BorderSide(color: Color(0x14FFFFFF), width: 1),
-    );
   }
 }
 

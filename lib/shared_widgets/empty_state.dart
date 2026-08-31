@@ -48,41 +48,49 @@ class EmptyState extends StatelessWidget {
           horizontal: Spacing.xl,
           vertical: compact ? Spacing.lg : Spacing.xxl,
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: circleSize,
-              height: circleSize,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: semantics.goldSurface,
-              ),
-              child: Icon(icon, size: iconSize, color: semantics.goldInk),
-            ),
-            SizedBox(height: compact ? Spacing.lg : Spacing.xl),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.titleMedium,
-            ),
-            SizedBox(height: Spacing.sm),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            if (actionLabel != null && onAction != null) ...[
-              SizedBox(height: Spacing.xl),
-              FilledButton(onPressed: onAction, child: Text(actionLabel!)),
-            ],
-          ],
-        )
-            .animate()
-            .fadeIn(duration: AppMotion.slow)
-            .slideY(begin: 0.06, end: 0, curve: AppMotion.enter),
+        child:
+            Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: circleSize,
+                      height: circleSize,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: semantics.goldSurface,
+                      ),
+                      child: Icon(
+                        icon,
+                        size: iconSize,
+                        color: semantics.goldInk,
+                      ),
+                    ),
+                    SizedBox(height: compact ? Spacing.lg : Spacing.xl),
+                    Text(
+                      title,
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: Spacing.sm),
+                    Text(
+                      message,
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    if (actionLabel != null && onAction != null) ...[
+                      const SizedBox(height: Spacing.xl),
+                      FilledButton(
+                        onPressed: onAction,
+                        child: Text(actionLabel!),
+                      ),
+                    ],
+                  ],
+                )
+                .animate()
+                .fadeIn(duration: AppMotion.slow)
+                .slideY(begin: 0.06, end: 0, curve: AppMotion.enter),
       ),
     );
   }

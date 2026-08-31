@@ -47,8 +47,9 @@ void main() {
     });
   }
 
-  testWidgets('fill scales with value, independently of the track',
-      (tester) async {
+  testWidgets('fill scales with value, independently of the track', (
+    tester,
+  ) async {
     // FractionallySizedBox sizes *itself* to the incoming constraints and only
     // its child to the factor, so the fill is measured on the child.
     final fill = find.descendant(

@@ -45,5 +45,11 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
+# Release signing credentials — never commit these. See README for how to
+# generate a keystore and key.properties for a Play release build.
+/android/key.properties
+*.jks
+*.keystore
+
 # Widget Preview related
 .widget_preview/

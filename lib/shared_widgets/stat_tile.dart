@@ -37,21 +37,22 @@ class StatTile extends StatelessWidget {
         Row(
           children: [
             if (icon != null) ...[
-              Icon(icon, size: 14, color: cs.onSurfaceVariant),
-              SizedBox(width: Spacing.xs),
+              Icon(icon, size: IconSize.xs, color: cs.onSurfaceVariant),
+              const SizedBox(width: Spacing.xs),
             ],
             Flexible(
               child: Text(
                 label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.labelSmall
-                    ?.copyWith(color: cs.onSurfaceVariant),
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: cs.onSurfaceVariant,
+                ),
               ),
             ),
           ],
         ),
-        SizedBox(height: Spacing.xxs),
+        const SizedBox(height: Spacing.xxs),
         Text(
           value,
           maxLines: 1,
@@ -59,13 +60,14 @@ class StatTile extends StatelessWidget {
           style: theme.textTheme.titleLarge?.copyWith(color: valueColor),
         ),
         if (caption != null) ...[
-          SizedBox(height: Spacing.xxs),
+          const SizedBox(height: Spacing.xxs),
           Text(
             caption!,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style:
-                theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: cs.onSurfaceVariant,
+            ),
           ),
         ],
       ],

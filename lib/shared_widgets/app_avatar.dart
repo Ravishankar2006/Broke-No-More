@@ -63,10 +63,16 @@ class AppAvatar extends StatelessWidget {
     );
 
     if (onTap == null) return avatar;
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: avatar,
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: emoji,
+      excludeSemantics: true,
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: avatar,
+      ),
     );
   }
 }

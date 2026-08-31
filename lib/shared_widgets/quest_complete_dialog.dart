@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/theme/app_dimens.dart';
 import '../core/theme/app_elevation.dart';
+import '../core/theme/app_motion.dart';
 import '../core/theme/app_semantic_colors.dart';
 import '../models/quest.dart';
 import 'celebration_effects.dart';
@@ -15,10 +16,7 @@ import 'quest_card.dart' show questTypeIcon;
 /// at all. Mirrors [showBadgeUnlockDialog]'s multi-item reveal, since one
 /// transaction can complete more than one quest at once (e.g. a streak quest
 /// and a count quest both crossing their target together).
-Future<void> showQuestCompleteDialog(
-  BuildContext context,
-  List<Quest> quests,
-) {
+Future<void> showQuestCompleteDialog(BuildContext context, List<Quest> quests) {
   return showDialog<void>(
     context: context,
     builder: (context) {
@@ -29,7 +27,7 @@ Future<void> showQuestCompleteDialog(
 
       return CelebrationBurst(
         child: AlertDialog(
-          contentPadding: EdgeInsets.fromLTRB(
+          contentPadding: const EdgeInsets.fromLTRB(
             Spacing.xl,
             Spacing.xl,
             Spacing.xl,
@@ -40,8 +38,8 @@ Future<void> showQuestCompleteDialog(
             children: [
               BounceIn(
                 child: Container(
-                  width: 72,
-                  height: 72,
+                  width: MedallionSize.profileAvatar,
+                  height: MedallionSize.profileAvatar,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: AppGradients.xp(theme.brightness),
@@ -50,11 +48,11 @@ Future<void> showQuestCompleteDialog(
                   child: Icon(
                     Icons.flag_circle,
                     color: semantics.onGold,
-                    size: 36,
+                    size: IconSize.xxl,
                   ),
                 ),
               ),
-              SizedBox(height: Spacing.sm),
+              const SizedBox(height: Spacing.sm),
               Text(
                 multiple
                     ? '${quests.length} quests completed!'
@@ -62,7 +60,7 @@ Future<void> showQuestCompleteDialog(
                 style: theme.textTheme.headlineSmall,
                 textAlign: TextAlign.center,
               ),
-              SizedBox(height: Spacing.lg),
+              const SizedBox(height: Spacing.lg),
               for (var i = 0; i < quests.length; i++)
                 Padding(
                   padding: EdgeInsets.only(
@@ -72,10 +70,10 @@ Future<void> showQuestCompleteDialog(
                     children: [
                       BounceIn(
                         // Stagger so several completions land one after another.
-                        delay: Duration(milliseconds: 120 * (i + 1)),
+                        delay: AppMotion.celebrationStagger * (i + 1),
                         child: Container(
-                          width: 44,
-                          height: 44,
+                          width: MedallionSize.badgeSmall,
+                          height: MedallionSize.badgeSmall,
                           decoration: BoxDecoration(
                             color: semantics.goldSurface,
                             shape: BoxShape.circle,
@@ -83,11 +81,11 @@ Future<void> showQuestCompleteDialog(
                           child: Icon(
                             questTypeIcon(quests[i].type),
                             color: semantics.goldInk,
-                            size: 22,
+                            size: IconSize.mdLg,
                           ),
                         ),
                       ),
-                      SizedBox(width: Spacing.lg),
+                      const SizedBox(width: Spacing.lg),
                       Expanded(
                         child: Text(
                           quests[i].title,
@@ -105,7 +103,7 @@ Future<void> showQuestCompleteDialog(
                   ),
                 ),
               if (multiple) ...[
-                SizedBox(height: Spacing.lg),
+                const SizedBox(height: Spacing.lg),
                 Text(
                   '+$totalXp XP total',
                   style: theme.textTheme.labelSmall?.copyWith(

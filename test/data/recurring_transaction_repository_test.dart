@@ -20,8 +20,9 @@ void main() {
   late Directory tempDir;
 
   setUp(() async {
-    tempDir =
-        await Directory.systemTemp.createTemp('recurring_transaction_test');
+    tempDir = await Directory.systemTemp.createTemp(
+      'recurring_transaction_test',
+    );
     Hive.init(tempDir.path);
     if (!Hive.isAdapterRegistered(0)) {
       Hive.registerAdapter(TransactionTypeAdapter());
@@ -44,27 +45,30 @@ void main() {
     await tempDir.delete(recursive: true);
   });
 
-  test('a due rule materializes into a real transaction and advances', () async {
-    final repo = RecurringTransactionRepository();
-    await repo.add(
-      amount: 500,
-      type: TransactionType.expense,
-      category: 'Subscriptions',
-      frequency: RecurrenceFrequency.monthly,
-      startDate: DateTime(2026, 8, 1),
-    );
+  test(
+    'a due rule materializes into a real transaction and advances',
+    () async {
+      final repo = RecurringTransactionRepository();
+      await repo.add(
+        amount: 500,
+        type: TransactionType.expense,
+        category: 'Subscriptions',
+        frequency: RecurrenceFrequency.monthly,
+        startDate: DateTime(2026, 8, 1),
+      );
 
-    await repo.materializeDue(now: DateTime(2026, 8, 1));
+      await repo.materializeDue(now: DateTime(2026, 8, 1));
 
-    final transactions = TransactionRepository().getAll();
-    expect(transactions, hasLength(1));
-    expect(transactions.single.amount, 500);
-    expect(transactions.single.category, 'Subscriptions');
-    expect(transactions.single.isQuickLog, isFalse);
+      final transactions = TransactionRepository().getAll();
+      expect(transactions, hasLength(1));
+      expect(transactions.single.amount, 500);
+      expect(transactions.single.category, 'Subscriptions');
+      expect(transactions.single.isQuickLog, isFalse);
 
-    final rule = repo.getAll().single;
-    expect(rule.nextDueDate, DateTime(2026, 9, 1));
-  });
+      final rule = repo.getAll().single;
+      expect(rule.nextDueDate, DateTime(2026, 9, 1));
+    },
+  );
 
   test('a rule not yet due materializes nothing', () async {
     final repo = RecurringTransactionRepository();
@@ -131,5 +135,54 @@ void main() {
     await repo.materializeDue(now: DateTime(2026, 8, 1));
 
     expect(TransactionRepository().getAll(), hasLength(1));
+  });
+
+  group('renameCategory', () {
+    test(
+      'rewrites every rule under the old name, leaves others alone',
+      () async {
+        final repo = RecurringTransactionRepository();
+        final rent = await repo.add(
+          amount: 15000,
+          type: TransactionType.expense,
+          category: 'Rent',
+          frequency: RecurrenceFrequency.monthly,
+          startDate: DateTime(2026, 8, 1),
+        );
+        final gym = await repo.add(
+          amount: 1000,
+          type: TransactionType.expense,
+          category: 'Gym',
+          frequency: RecurrenceFrequency.monthly,
+          startDate: DateTime(2026, 8, 1),
+        );
+
+        final touched = await repo.renameCategory('Rent', 'Housing');
+
+        expect(touched, 1);
+        expect(
+          repo.getAll().firstWhere((r) => r.id == rent.id).category,
+          'Housing',
+        );
+        expect(repo.getAll().firstWhere((r) => r.id == gym.id).category, 'Gym');
+      },
+    );
+
+    test('countForCategory matches renameCategory\'s own count', () async {
+      final repo = RecurringTransactionRepository();
+      await repo.add(
+        amount: 15000,
+        type: TransactionType.expense,
+        category: 'Rent',
+        frequency: RecurrenceFrequency.monthly,
+        startDate: DateTime(2026, 8, 1),
+      );
+
+      expect(repo.countForCategory('Rent'), 1);
+      final touched = await repo.renameCategory('Rent', 'Housing');
+      expect(touched, 1);
+      expect(repo.countForCategory('Rent'), 0);
+      expect(repo.countForCategory('Housing'), 1);
+    });
   });
 }

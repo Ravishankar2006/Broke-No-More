@@ -7,6 +7,7 @@ import '../core/utils/category_icons.dart';
 import '../core/utils/currency_formatter.dart';
 import '../models/transaction.dart';
 import '../providers/category_provider.dart';
+import '../providers/profile_provider.dart';
 
 /// One logged transaction as a list row.
 ///
@@ -44,6 +45,7 @@ class TransactionTile extends ConsumerWidget {
 
     final iconId = ref.watch(categoryIconIdsProvider)[transaction.category];
     final icon = iconId == null ? Icons.category : categoryIcon(iconId);
+    final currencyCode = ref.watch(currentCurrencyCodeProvider);
 
     final xp = transaction.xpAwarded;
     final note = transaction.note?.trim();
@@ -64,23 +66,23 @@ class TransactionTile extends ConsumerWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(AppRadius.md),
         child: Padding(
-          padding: EdgeInsets.symmetric(
+          padding: const EdgeInsets.symmetric(
             horizontal: Spacing.sm,
             vertical: Spacing.md,
           ),
           child: Row(
             children: [
               Container(
-                width: 40,
-                height: 40,
+                width: MedallionSize.transactionChip,
+                height: MedallionSize.transactionChip,
                 decoration: BoxDecoration(
                   color: (isExpense ? semantics.expense : semantics.income)
                       .withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(AppRadius.md),
                 ),
-                child: Icon(icon, size: 20, color: amountColor),
+                child: Icon(icon, size: IconSize.md, color: amountColor),
               ),
-              SizedBox(width: Spacing.md),
+              const SizedBox(width: Spacing.md),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -91,30 +93,32 @@ class TransactionTile extends ConsumerWidget {
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.titleSmall,
                     ),
-                    SizedBox(height: Spacing.xxs),
+                    const SizedBox(height: Spacing.xxs),
                     Text(
                       subtitle,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(color: cs.onSurfaceVariant),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ),
               ),
-              SizedBox(width: Spacing.sm),
+              const SizedBox(width: Spacing.sm),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    '${isExpense ? '−' : '+'}${formatCurrency(transaction.amount)}',
+                    '${isExpense ? '−' : '+'}'
+                    '${formatCurrency(transaction.amount, currencyCode: currencyCode)}',
                     style: theme.textTheme.titleSmall?.copyWith(
                       color: amountColor,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                   if (showXp && xp != null && xp > 0) ...[
-                    SizedBox(height: Spacing.xxs),
+                    const SizedBox(height: Spacing.xxs),
                     Text(
                       '+$xp XP',
                       style: theme.textTheme.labelSmall?.copyWith(
@@ -140,8 +144,18 @@ class TransactionTile extends ConsumerWidget {
 
   static String _formatDay(DateTime date) {
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     return '${date.day} ${months[date.month - 1]}';
   }

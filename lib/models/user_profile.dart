@@ -21,13 +21,19 @@ class UserProfile extends HiveObject {
     this.lastBudgetBonusDate,
     this.daysUnderBudgetCount = 0,
     bool? remindersEnabled,
-  })  : lastLoggedDate = lastLoggedDate ?? joinDate,
-        badgeIds = badgeIds ?? <String>[],
-        lastFreezeResetDate = lastFreezeResetDate ?? joinDate,
-        // Nullable here (unlike the other defaulted fields above) so Hive
-        // records saved before this field existed deserialize as `false`
-        // instead of throwing on a missing key.
-        remindersEnabled = remindersEnabled ?? false;
+    String? currencyCode,
+  }) : lastLoggedDate = lastLoggedDate ?? joinDate,
+       badgeIds = badgeIds ?? <String>[],
+       lastFreezeResetDate = lastFreezeResetDate ?? joinDate,
+       // Nullable here (unlike the other defaulted fields above) so Hive
+       // records saved before this field existed deserialize as `false`
+       // instead of throwing on a missing key.
+       remindersEnabled = remindersEnabled ?? false,
+       // Same reasoning: profiles saved before currency selection existed
+       // must keep formatting as ₹, not fall over on a missing key. Kept as
+       // a literal rather than a shared constant — models stay dependency-free
+       // of core/utils, same as CategoryRecord.iconId not importing IconData.
+       currencyCode = currencyCode ?? 'INR';
 
   @HiveField(0)
   String id;
@@ -88,6 +94,13 @@ class UserProfile extends HiveObject {
   @HiveField(15)
   bool remindersEnabled;
 
+  /// ISO 4217 code (e.g. 'INR', 'USD') — see [kSupportedCurrencies]. Drives
+  /// every [formatCurrency] call in the app, and the quest engine's
+  /// budget-quest copy (which takes the symbol as a plain string to stay
+  /// Flutter-free).
+  @HiveField(16)
+  String currencyCode;
+
   UserProfile copyWith({
     String? name,
     String? avatarId,
@@ -107,6 +120,7 @@ class UserProfile extends HiveObject {
     DateTime? lastBudgetBonusDate,
     int? daysUnderBudgetCount,
     bool? remindersEnabled,
+    String? currencyCode,
   }) {
     return UserProfile(
       id: id,
@@ -118,14 +132,16 @@ class UserProfile extends HiveObject {
       currentStreak: currentStreak ?? this.currentStreak,
       longestStreak: longestStreak ?? this.longestStreak,
       lastLoggedDate: lastLoggedDate ?? this.lastLoggedDate,
-      monthlyBudget:
-          clearMonthlyBudget ? null : (monthlyBudget ?? this.monthlyBudget),
+      monthlyBudget: clearMonthlyBudget
+          ? null
+          : (monthlyBudget ?? this.monthlyBudget),
       badgeIds: badgeIds ?? this.badgeIds,
       streakFreezesLeft: streakFreezesLeft ?? this.streakFreezesLeft,
       lastFreezeResetDate: lastFreezeResetDate ?? this.lastFreezeResetDate,
       lastBudgetBonusDate: lastBudgetBonusDate ?? this.lastBudgetBonusDate,
       daysUnderBudgetCount: daysUnderBudgetCount ?? this.daysUnderBudgetCount,
       remindersEnabled: remindersEnabled ?? this.remindersEnabled,
+      currencyCode: currencyCode ?? this.currencyCode,
     );
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/utils/currency_catalog.dart';
 import '../data/quest_repository.dart';
 import '../data/skipped_quest_repository.dart';
 import '../models/quest.dart';
@@ -26,8 +27,9 @@ class QuestsNotifier extends Notifier<List<Quest>> {
   }
 }
 
-final questsProvider =
-    NotifierProvider<QuestsNotifier, List<Quest>>(QuestsNotifier.new);
+final questsProvider = NotifierProvider<QuestsNotifier, List<Quest>>(
+  QuestsNotifier.new,
+);
 
 final activeQuestsProvider = Provider<List<Quest>>((ref) {
   return ref
@@ -42,10 +44,17 @@ final activeQuestsProvider = Provider<List<Quest>>((ref) {
 final questCandidatesProvider = Provider<List<QuestCandidate>>((ref) {
   final transactions = ref.watch(transactionsProvider);
   final currentStreak = ref.watch(profileProvider)?.currentStreak ?? 0;
+  final currencySymbol = currencyInfoFor(
+    ref.watch(currentCurrencyCodeProvider),
+  ).symbol;
   ref.watch(questsProvider);
   return ref
       .watch(questRepositoryProvider)
-      .generateCandidates(transactions, currentStreak: currentStreak);
+      .generateCandidates(
+        transactions,
+        currentStreak: currentStreak,
+        currencySymbol: currencySymbol,
+      );
 });
 
 final skippedQuestRepositoryProvider = Provider<SkippedQuestRepository>((ref) {
@@ -70,8 +79,8 @@ class SkippedQuestsNotifier extends Notifier<Set<String>> {
 
 final skippedQuestsProvider =
     NotifierProvider<SkippedQuestsNotifier, Set<String>>(
-  SkippedQuestsNotifier.new,
-);
+      SkippedQuestsNotifier.new,
+    );
 
 /// Candidates with the user's dismissals already filtered out.
 final visibleQuestCandidatesProvider = Provider<List<QuestCandidate>>((ref) {

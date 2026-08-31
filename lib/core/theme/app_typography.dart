@@ -5,6 +5,12 @@ import 'package:flutter/material.dart';
 /// google_fonts' runtime fetch was never viable in a fully-offline app.
 const String kFontFamily = 'Plus Jakarta Sans';
 
+/// The tracking applied to every all-caps "overline" label — section
+/// headers, day-group labels, streak-hero captions ("DAY", "BEST").
+/// Previously each site hand-picked its own value (0.8-1.2) with no shared
+/// rule; this is the one true value, matched to `SectionHeader`'s.
+const double kOverlineLetterSpacing = 1.1;
+
 /// Build the text theme for a given brightness. Called from app_theme.dart.
 TextTheme buildTextTheme(ColorScheme scheme, Brightness brightness) {
   final isDark = brightness == Brightness.dark;
@@ -25,7 +31,47 @@ TextTheme buildTextTheme(ColorScheme scheme, Brightness brightness) {
         fontFamily: fontFamily,
       )
       .copyWith(
+        // Display — the app's biggest hero numbers (streak count, the
+        // log-sheet amount field). Sizes match Material's own defaults
+        // (32/36/45/57) rather than a redesigned scale, so adding these
+        // doesn't risk a layout regression in the two places that were
+        // already rendering at the untuned default; what was missing was
+        // the family's letterSpacing/height/weight convention, extrapolated
+        // from headlineSmall/headlineMedium below.
+        displayLarge: TextStyle(
+          fontSize: 57,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -1.0,
+          height: 1.0,
+          fontFamily: fontFamily,
+          color: onSurface,
+        ),
+        displayMedium: TextStyle(
+          fontSize: 45,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.8,
+          height: 1.05,
+          fontFamily: fontFamily,
+          color: onSurface,
+        ),
+        displaySmall: TextStyle(
+          fontSize: 36,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.6,
+          height: 1.1,
+          fontFamily: fontFamily,
+          color: onSurface,
+        ),
+
         // Headlines — used for large numbers (amounts, balances)
+        headlineLarge: TextStyle(
+          fontSize: 32,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.5,
+          height: 1.15,
+          fontFamily: fontFamily,
+          color: onSurface,
+        ),
         headlineMedium: TextStyle(
           fontSize: 26,
           fontWeight: FontWeight.w700,

@@ -60,6 +60,38 @@ MaterializationResult materializeOccurrences({
   return MaterializationResult(dueDates: capped, nextDueDate: due);
 }
 
+/// Occurrence dates a rule will produce within [rangeStart, rangeEnd]
+/// inclusive — the forward-looking counterpart to [materializeOccurrences],
+/// used to forecast upcoming commitments (e.g. Insights' "left to pay this
+/// month") rather than to generate past-due transactions. Pure: doesn't
+/// touch [nextDueDate] or persist anything.
+List<DateTime> forecastOccurrences({
+  required DateTime nextDueDate,
+  required RecurrenceFrequency frequency,
+  required DateTime rangeStart,
+  required DateTime rangeEnd,
+  DateTime? endDate,
+}) {
+  final cutoff = (endDate != null && endDate.isBefore(rangeEnd))
+      ? endDate
+      : rangeEnd;
+
+  var due = nextDueDate;
+  // Defensive: nextDueDate should already be at or past rangeStart (the
+  // repository advances it on every materialize pass), but skip forward
+  // rather than assume it.
+  while (due.isBefore(rangeStart)) {
+    due = _advance(due, frequency);
+  }
+
+  final result = <DateTime>[];
+  while (!due.isAfter(cutoff)) {
+    result.add(due);
+    due = _advance(due, frequency);
+  }
+  return result;
+}
+
 DateTime _advance(DateTime date, RecurrenceFrequency frequency) {
   return switch (frequency) {
     RecurrenceFrequency.daily => date.add(const Duration(days: 1)),
@@ -69,7 +101,10 @@ DateTime _advance(DateTime date, RecurrenceFrequency frequency) {
     // rolls into early March) — a rule anchored on the 29th-31st drifts
     // across short months. Accepted as a pragmatic simplification rather
     // than clamping to each month's actual last day.
-    RecurrenceFrequency.monthly =>
-      DateTime(date.year, date.month + 1, date.day),
+    RecurrenceFrequency.monthly => DateTime(
+      date.year,
+      date.month + 1,
+      date.day,
+    ),
   };
 }

@@ -23,8 +23,11 @@ void main() {
         bytes.buffer.asUint8List(),
       );
 
-      expect(composition.layers.length, expected.layers,
-          reason: 'layer count changed for $path');
+      expect(
+        composition.layers.length,
+        expected.layers,
+        reason: 'layer count changed for $path',
+      );
       expect(
         composition.duration.inMilliseconds,
         greaterThanOrEqualTo(expected.minDurationMs.toInt()),

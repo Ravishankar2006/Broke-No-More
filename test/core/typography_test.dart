@@ -26,15 +26,18 @@ void main() {
 
   for (final (name, weight) in weights) {
     test('$name ($weight) is bundled as a real font file', () async {
-      final data =
-          await rootBundle.load('assets/fonts/PlusJakartaSans-$name.ttf');
-      expect(data.lengthInBytes, greaterThan(10000),
-          reason: 'a truncated or placeholder file would load but not render');
+      final data = await rootBundle.load(
+        'assets/fonts/PlusJakartaSans-$name.ttf',
+      );
+      expect(
+        data.lengthInBytes,
+        greaterThan(10000),
+        reason: 'a truncated or placeholder file would load but not render',
+      );
 
       // TrueType files start with the version tag 0x00010000.
       final header = data.buffer.asUint8List(0, 4);
-      expect(header, [0x00, 0x01, 0x00, 0x00],
-          reason: 'not a TrueType file');
+      expect(header, [0x00, 0x01, 0x00, 0x00], reason: 'not a TrueType file');
     });
   }
 
@@ -55,8 +58,11 @@ void main() {
       };
 
       styles.forEach((role, style) {
-        expect(style?.fontFamily, kFontFamily,
-            reason: '$role fell back to the platform default');
+        expect(
+          style?.fontFamily,
+          kFontFamily,
+          reason: '$role fell back to the platform default',
+        );
       });
     }
   });

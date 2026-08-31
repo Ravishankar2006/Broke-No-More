@@ -4,10 +4,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_dimens.dart';
 import '../../core/theme/app_motion.dart';
 import '../../core/utils/category_icons.dart';
+import '../../core/utils/currency_catalog.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../models/category_record.dart';
 import '../../models/transaction.dart';
 import '../../providers/category_provider.dart';
+import '../../providers/profile_provider.dart';
+import '../../providers/recurring_transaction_provider.dart';
+import '../../providers/transaction_provider.dart';
+import '../../providers/xp_engine_provider.dart';
 
 class CategoryManagementScreen extends ConsumerStatefulWidget {
   const CategoryManagementScreen({super.key});
@@ -27,11 +32,16 @@ class _CategoryManagementScreenState
   }
 
   Future<void> _openEditor({CategoryRecord? existing}) async {
+    final currencyCode = ref.read(currentCurrencyCodeProvider);
     final result =
         await showDialog<({String name, String iconId, double? budget})>(
-      context: context,
-      builder: (_) => _CategoryEditorDialog(type: _type, existing: existing),
-    );
+          context: context,
+          builder: (_) => _CategoryEditorDialog(
+            type: _type,
+            existing: existing,
+            currencySymbol: currencyInfoFor(currencyCode).symbol,
+          ),
+        );
     if (result == null) return;
 
     final repo = ref.read(categoryRepositoryProvider);
@@ -43,14 +53,76 @@ class _CategoryManagementScreenState
         budget: result.budget,
       );
     } else {
+      final oldName = existing.name;
       await repo.update(
         existing,
         name: result.name,
         iconId: result.iconId,
         budget: result.budget,
       );
+      if (oldName != result.name) {
+        await _offerHistoryMigration(oldName, result.name);
+      }
     }
     _refresh();
+  }
+
+  /// `Transaction.category` and `RecurringTransaction.category` are both
+  /// denormalized strings — renaming a category here otherwise leaves every
+  /// past row (and every future occurrence a recurring rule would generate)
+  /// still pointing at the old name. Only prompts when there's actually
+  /// something under the old name to migrate.
+  Future<void> _offerHistoryMigration(String oldName, String newName) async {
+    final transactionCount = ref
+        .read(transactionRepositoryProvider)
+        .countForCategory(oldName);
+    final recurringCount = ref
+        .read(recurringTransactionRepositoryProvider)
+        .countForCategory(oldName);
+    if (transactionCount == 0 && recurringCount == 0) return;
+
+    final parts = [
+      if (transactionCount > 0)
+        '$transactionCount transaction${transactionCount == 1 ? '' : 's'}',
+      if (recurringCount > 0)
+        '$recurringCount recurring rule${recurringCount == 1 ? '' : 's'}',
+    ];
+
+    if (!mounted) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Update existing history too?'),
+        content: Text(
+          '${parts.join(' and ')} still say "$oldName". Rename them to '
+          '"$newName" as well?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Leave as-is'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Rename everywhere'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await ref
+          .read(xpEngineOrchestratorProvider)
+          .renameCategory(oldName, newName);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Couldn't update existing history — please try again."),
+        ),
+      );
+    }
   }
 
   /// Confirms first, then offers an undo.
@@ -118,7 +190,11 @@ class _CategoryManagementScreenState
     );
   }
 
-  Future<void> _reorder(List<CategoryRecord> current, int oldIndex, int newIndex) async {
+  Future<void> _reorder(
+    List<CategoryRecord> current,
+    int oldIndex,
+    int newIndex,
+  ) async {
     final reordered = List<CategoryRecord>.from(current);
     final moved = reordered.removeAt(oldIndex);
     reordered.insert(newIndex, moved);
@@ -131,13 +207,19 @@ class _CategoryManagementScreenState
     final categories = _type == TransactionType.expense
         ? ref.watch(expenseCategoriesProvider)
         : ref.watch(incomeCategoriesProvider);
+    final currencyCode = ref.watch(currentCurrencyCodeProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Manage categories')),
       body: Column(
         children: [
           Padding(
-            padding: EdgeInsets.fromLTRB(Spacing.lg, Spacing.lg, Spacing.lg, Spacing.sm),
+            padding: const EdgeInsets.fromLTRB(
+              Spacing.lg,
+              Spacing.lg,
+              Spacing.lg,
+              Spacing.sm,
+            ),
             child: SegmentedButton<TransactionType>(
               segments: const [
                 ButtonSegment(
@@ -158,7 +240,7 @@ class _CategoryManagementScreenState
             child: ReorderableListView.builder(
               // Bottom room for the extended FAB, which used to sit on top of
               // the last row.
-              padding: EdgeInsets.only(
+              padding: const EdgeInsets.only(
                 top: Spacing.sm,
                 bottom: Spacing.xxxl * 2,
               ),
@@ -172,7 +254,11 @@ class _CategoryManagementScreenState
                   leading: Icon(categoryIcon(category.iconId)),
                   title: Text(category.name),
                   subtitle: category.budget != null
-                      ? Text('Budget: ${formatCurrency(category.budget!)}/mo')
+                      ? Text(
+                          'Budget: '
+                          '${formatCurrency(category.budget!, currencyCode: currencyCode)}'
+                          '/mo',
+                        )
                       : null,
                   onTap: () => _openEditor(existing: category),
                   trailing: Row(
@@ -187,9 +273,9 @@ class _CategoryManagementScreenState
                       // the one thing that looked like a handle wasn't one.
                       ReorderableDragStartListener(
                         index: index,
-                        child: Padding(
+                        child: const Padding(
                           padding: EdgeInsets.all(Spacing.sm),
-                          child: const Icon(Icons.drag_handle),
+                          child: Icon(Icons.drag_handle),
                         ),
                       ),
                     ],
@@ -210,22 +296,29 @@ class _CategoryManagementScreenState
 }
 
 class _CategoryEditorDialog extends StatefulWidget {
-  const _CategoryEditorDialog({required this.type, this.existing});
+  const _CategoryEditorDialog({
+    required this.type,
+    this.existing,
+    required this.currencySymbol,
+  });
 
   final TransactionType type;
   final CategoryRecord? existing;
+  final String currencySymbol;
 
   @override
   State<_CategoryEditorDialog> createState() => _CategoryEditorDialogState();
 }
 
 class _CategoryEditorDialogState extends State<_CategoryEditorDialog> {
-  late final _nameController =
-      TextEditingController(text: widget.existing?.name ?? '');
+  late final _nameController = TextEditingController(
+    text: widget.existing?.name ?? '',
+  );
   late final _budgetController = TextEditingController(
     text: widget.existing?.budget?.toStringAsFixed(0) ?? '',
   );
-  late String _iconId = widget.existing?.iconId ?? kCategoryIconChoices.keys.first;
+  late String _iconId =
+      widget.existing?.iconId ?? kCategoryIconChoices.keys.first;
   String? _budgetError;
 
   @override
@@ -252,21 +345,23 @@ class _CategoryEditorDialogState extends State<_CategoryEditorDialog> {
             // Budgets are a spending concept — offering one for an income
             // category ("cap how much I earn") wouldn't mean anything.
             if (widget.type == TransactionType.expense) ...[
-              SizedBox(height: Spacing.lg),
+              const SizedBox(height: Spacing.lg),
               TextField(
                 controller: _budgetController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
                 decoration: InputDecoration(
                   labelText: 'Monthly budget (optional)',
-                  prefixText: '₹ ',
+                  prefixText: '${widget.currencySymbol} ',
                   hintText: 'e.g. 2000',
                   errorText: _budgetError,
                 ),
               ),
             ],
-            SizedBox(height: Spacing.lg),
+            const SizedBox(height: Spacing.lg),
             Text('Icon', style: Theme.of(context).textTheme.titleSmall),
-            SizedBox(height: Spacing.sm),
+            const SizedBox(height: Spacing.sm),
             // A scrollable grid of rounded cells with an animated selection,
             // replacing a Wrap of raw CircleAvatars that had no selection
             // affordance beyond a flat colour swap.
@@ -279,29 +374,40 @@ class _CategoryEditorDialogState extends State<_CategoryEditorDialog> {
                   children: kCategoryIconChoices.entries.map((entry) {
                     final selected = entry.key == _iconId;
                     final cs = Theme.of(context).colorScheme;
-                    return GestureDetector(
-                      onTap: () => setState(() => _iconId = entry.key),
-                      behavior: HitTestBehavior.opaque,
-                      child: AnimatedContainer(
-                        duration: AppMotion.quick,
-                        curve: AppMotion.standardCurve,
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: selected
-                              ? cs.primary
-                              : cs.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(AppRadius.md),
-                          border: selected
-                              ? Border.all(color: cs.primary, width: 2)
-                              : null,
-                        ),
-                        child: Icon(
-                          entry.value,
-                          size: 22,
-                          color: selected
-                              ? cs.onPrimary
-                              : cs.onSurfaceVariant,
+                    // Bare icon glyphs otherwise carry zero information for a
+                    // screen reader — the id doubles as a readable label
+                    // since every key is already a plain English word.
+                    final label =
+                        entry.key[0].toUpperCase() + entry.key.substring(1);
+                    return Semantics(
+                      button: true,
+                      selected: selected,
+                      label: label,
+                      excludeSemantics: true,
+                      child: GestureDetector(
+                        onTap: () => setState(() => _iconId = entry.key),
+                        behavior: HitTestBehavior.opaque,
+                        child: AnimatedContainer(
+                          duration: AppMotion.quick,
+                          curve: AppMotion.standardCurve,
+                          width: MedallionSize.categoryCell,
+                          height: MedallionSize.categoryCell,
+                          decoration: BoxDecoration(
+                            color: selected
+                                ? cs.primary
+                                : cs.surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                            border: selected
+                                ? Border.all(color: cs.primary, width: 2)
+                                : null,
+                          ),
+                          child: Icon(
+                            entry.value,
+                            size: IconSize.mdLg,
+                            color: selected
+                                ? cs.onPrimary
+                                : cs.onSurfaceVariant,
+                          ),
                         ),
                       ),
                     );
@@ -333,8 +439,9 @@ class _CategoryEditorDialogState extends State<_CategoryEditorDialog> {
                 }
               }
             }
-            Navigator.of(context)
-                .pop((name: name, iconId: _iconId, budget: budget));
+            Navigator.of(
+              context,
+            ).pop((name: name, iconId: _iconId, budget: budget));
           },
           child: const Text('Save'),
         ),

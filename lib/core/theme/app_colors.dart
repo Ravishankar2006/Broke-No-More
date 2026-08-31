@@ -29,8 +29,12 @@ abstract class AppPalette {
   static const Color goldTintLight = Color(0xFFFFF1C9);
   static const Color goldTintDark = Color(0xFF4A3300);
   // Ink versions (text/icon on canvas/card):
-  static const Color goldInkLight = Color(0xFF9A6C00); // gold text on light canvas/card
-  static const Color goldInkDark = Color(0xFFF7C846); // gold text on dark canvas/card
+  static const Color goldInkLight = Color(
+    0xFF9A6C00,
+  ); // gold text on light canvas/card
+  static const Color goldInkDark = Color(
+    0xFFF7C846,
+  ); // gold text on dark canvas/card
   // Ink placed ON gold fills (never Colors.white):
   static const Color onGold = Color(0xFF1A1200);
 

@@ -18,11 +18,8 @@ class Skeleton extends StatefulWidget {
   });
 
   /// A full-width block.
-  const Skeleton.block({
-    super.key,
-    required this.height,
-    this.radius,
-  }) : width = double.infinity;
+  const Skeleton.block({super.key, required this.height, this.radius})
+    : width = double.infinity;
 
   final double width;
   final double height;
@@ -36,8 +33,21 @@ class _SkeletonState extends State<Skeleton>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 1400),
-  )..repeat();
+    duration: AppMotion.shimmer,
+  );
+  bool _started = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // A perpetually-sweeping gradient is exactly what "remove animations"
+    // asks to be turned off; deferred from initState since it needs
+    // MediaQuery, which isn't available yet at construction time.
+    if (!_started && !MediaQuery.disableAnimationsOf(context)) {
+      _started = true;
+      _controller.repeat();
+    }
+  }
 
   @override
   void dispose() {
@@ -59,8 +69,9 @@ class _SkeletonState extends State<Skeleton>
         builder: (context, _) {
           return DecoratedBox(
             decoration: BoxDecoration(
-              borderRadius:
-                  BorderRadius.circular(widget.radius ?? AppRadius.sm),
+              borderRadius: BorderRadius.circular(
+                widget.radius ?? AppRadius.sm,
+              ),
               gradient: LinearGradient(
                 colors: [base, highlight, base],
                 stops: const [0.0, 0.5, 1.0],
@@ -86,7 +97,7 @@ class SkeletonCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.all(Spacing.lg),
+      padding: const EdgeInsets.all(Spacing.lg),
       height: height,
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
@@ -97,7 +108,7 @@ class SkeletonCard extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           for (var i = 0; i < lines; i++) ...[
-            if (i > 0) SizedBox(height: Spacing.md),
+            if (i > 0) const SizedBox(height: Spacing.md),
             Skeleton(
               // Taper the lines so it reads as text, not as bars.
               width: i == 0 ? 140 : double.infinity,
@@ -119,28 +130,10 @@ class SkeletonScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView.separated(
-      padding: EdgeInsets.all(Spacing.lg),
+      padding: const EdgeInsets.all(Spacing.lg),
       itemCount: cards,
-      separatorBuilder: (_, _) => SizedBox(height: Spacing.md),
+      separatorBuilder: (_, _) => const SizedBox(height: Spacing.md),
       itemBuilder: (_, i) => SkeletonCard(lines: i == 0 ? 4 : 3),
-    );
-  }
-}
-
-/// Fades [child] in once it replaces a skeleton, so data doesn't pop.
-class FadeInContent extends StatelessWidget {
-  const FadeInContent({super.key, required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0, end: 1),
-      duration: AppMotion.standard,
-      curve: AppMotion.enter,
-      builder: (context, t, child) => Opacity(opacity: t, child: child),
-      child: child,
     );
   }
 }

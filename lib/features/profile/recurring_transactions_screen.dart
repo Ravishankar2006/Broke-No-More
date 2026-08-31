@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,12 +8,15 @@ import 'package:intl/intl.dart';
 import '../../core/theme/app_dimens.dart';
 import '../../core/theme/app_semantic_colors.dart';
 import '../../core/utils/category_icons.dart';
+import '../../core/utils/currency_catalog.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../models/recurring_transaction.dart';
 import '../../models/transaction.dart';
 import '../../providers/category_provider.dart';
+import '../../providers/profile_provider.dart';
 import '../../providers/recurring_transaction_provider.dart';
 import '../../shared_widgets/app_card.dart';
+import '../../shared_widgets/discard_changes_guard.dart';
 import '../../shared_widgets/empty_state.dart';
 
 String recurrenceFrequencyLabel(RecurrenceFrequency frequency) {
@@ -33,18 +38,20 @@ class RecurringTransactionsScreen extends ConsumerWidget {
     final rules = [...ref.watch(recurringTransactionsProvider)]
       ..sort((a, b) => a.nextDueDate.compareTo(b.nextDueDate));
     final iconIds = ref.watch(categoryIconIdsProvider);
+    final currencyCode = ref.watch(currentCurrencyCodeProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Recurring transactions')),
       body: rules.isEmpty
-          ? EmptyState(
+          ? const EmptyState(
               icon: Icons.autorenew_rounded,
               title: 'Nothing set up yet',
-              message: 'Rent, a subscription, an allowance — set it up once '
+              message:
+                  'Rent, a subscription, an allowance — set it up once '
                   'and it logs itself on schedule from here on.',
             )
           : ListView.builder(
-              padding: EdgeInsets.fromLTRB(
+              padding: const EdgeInsets.fromLTRB(
                 Spacing.lg,
                 Spacing.lg,
                 Spacing.lg,
@@ -54,17 +61,20 @@ class RecurringTransactionsScreen extends ConsumerWidget {
               itemBuilder: (context, index) {
                 final rule = rules[index];
                 return Padding(
-                  padding: EdgeInsets.only(bottom: Spacing.md),
+                  padding: const EdgeInsets.only(bottom: Spacing.md),
                   child: _RecurringTransactionCard(
                     rule: rule,
                     iconId: iconIds[rule.category],
+                    currencyCode: currencyCode,
                     onTap: () => _openEditor(context, ref, existing: rule),
                     onToggleActive: (active) => ref
                         .read(recurringTransactionRepositoryProvider)
                         .setActive(rule, active)
-                        .then((_) => ref
-                            .read(recurringTransactionsProvider.notifier)
-                            .refresh()),
+                        .then(
+                          (_) => ref
+                              .read(recurringTransactionsProvider.notifier)
+                              .refresh(),
+                        ),
                     onDelete: () => _delete(context, ref, rule),
                   ),
                 );
@@ -136,6 +146,7 @@ class _RecurringTransactionCard extends StatelessWidget {
     required this.onTap,
     required this.onToggleActive,
     required this.onDelete,
+    required this.currencyCode,
   });
 
   final RecurringTransaction rule;
@@ -143,6 +154,7 @@ class _RecurringTransactionCard extends StatelessWidget {
   final VoidCallback onTap;
   final ValueChanged<bool> onToggleActive;
   final VoidCallback onDelete;
+  final String currencyCode;
 
   @override
   Widget build(BuildContext context) {
@@ -162,16 +174,16 @@ class _RecurringTransactionCard extends StatelessWidget {
         child: Row(
           children: [
             Container(
-              width: 40,
-              height: 40,
+              width: MedallionSize.transactionChip,
+              height: MedallionSize.transactionChip,
               decoration: BoxDecoration(
                 color: (isExpense ? semantics.expense : semantics.income)
                     .withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(AppRadius.md),
               ),
-              child: Icon(icon, size: 20, color: amountColor),
+              child: Icon(icon, size: IconSize.md, color: amountColor),
             ),
-            SizedBox(width: Spacing.md),
+            const SizedBox(width: Spacing.md),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -182,11 +194,11 @@ class _RecurringTransactionCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.titleSmall,
                   ),
-                  SizedBox(height: Spacing.xxs),
+                  const SizedBox(height: Spacing.xxs),
                   Text(
                     rule.isActive
                         ? '${recurrenceFrequencyLabel(rule.frequency)} · '
-                            'Next ${dateFormat.format(rule.nextDueDate)}'
+                              'Next ${dateFormat.format(rule.nextDueDate)}'
                         : '${recurrenceFrequencyLabel(rule.frequency)} · Paused',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -197,15 +209,16 @@ class _RecurringTransactionCard extends StatelessWidget {
                 ],
               ),
             ),
-            SizedBox(width: Spacing.sm),
+            const SizedBox(width: Spacing.sm),
             Text(
-              '${isExpense ? '−' : '+'}${formatCurrency(rule.amount)}',
+              '${isExpense ? '−' : '+'}'
+              '${formatCurrency(rule.amount, currencyCode: currencyCode)}',
               style: theme.textTheme.titleSmall?.copyWith(
                 color: amountColor,
                 fontWeight: FontWeight.w700,
               ),
             ),
-            SizedBox(width: Spacing.xs),
+            const SizedBox(width: Spacing.xs),
             Switch(value: rule.isActive, onChanged: onToggleActive),
             IconButton(
               icon: const Icon(Icons.delete_outline),
@@ -237,8 +250,9 @@ class _RecurringTransactionEditorSheetState
   late final _amountController = TextEditingController(
     text: widget.existing?.amount.toStringAsFixed(0) ?? '',
   );
-  late final _noteController =
-      TextEditingController(text: widget.existing?.note ?? '');
+  late final _noteController = TextEditingController(
+    text: widget.existing?.note ?? '',
+  );
   late String? _category = widget.existing?.category;
   late RecurrenceFrequency _frequency =
       widget.existing?.frequency ?? RecurrenceFrequency.monthly;
@@ -258,6 +272,23 @@ class _RecurringTransactionEditorSheetState
     _amountController.dispose();
     _noteController.dispose();
     super.dispose();
+  }
+
+  bool get _isDirty {
+    final existing = widget.existing;
+    if (existing == null) {
+      return _amountController.text.trim().isNotEmpty ||
+          _category != null ||
+          _noteController.text.trim().isNotEmpty;
+    }
+    return _amountController.text.trim() !=
+            existing.amount.toStringAsFixed(0) ||
+        _type != existing.type ||
+        _category != existing.category ||
+        _noteController.text.trim() != (existing.note ?? '') ||
+        _frequency != existing.frequency ||
+        _startDate != existing.startDate ||
+        _endDate != existing.endDate;
   }
 
   double? get _amount => double.tryParse(_amountController.text.trim());
@@ -290,7 +321,7 @@ class _RecurringTransactionEditorSheetState
   Future<void> _submit() async {
     setState(() => _submitted = true);
     if (!_canSubmit) {
-      HapticFeedback.heavyImpact();
+      unawaited(HapticFeedback.heavyImpact());
       return;
     }
 
@@ -339,6 +370,9 @@ class _RecurringTransactionEditorSheetState
     final categories = _type == TransactionType.expense
         ? ref.watch(expenseCategoriesProvider)
         : ref.watch(incomeCategoriesProvider);
+    final currencySymbol = currencyInfoFor(
+      ref.watch(currentCurrencyCodeProvider),
+    ).symbol;
 
     // The category list changed type (or a saved category no longer
     // exists) — drop a selection that's no longer valid rather than
@@ -347,144 +381,164 @@ class _RecurringTransactionEditorSheetState
       _category = null;
     }
 
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(Spacing.lg, Spacing.lg, Spacing.lg, Spacing.lg),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  widget.isEditing ? 'Edit recurring' : 'Add recurring',
-                  style: theme.textTheme.titleLarge,
-                ),
-                SizedBox(height: Spacing.lg),
-                SegmentedButton<TransactionType>(
-                  segments: const [
-                    ButtonSegment(
-                      value: TransactionType.expense,
-                      label: Text('Expense'),
-                    ),
-                    ButtonSegment(
-                      value: TransactionType.income,
-                      label: Text('Income'),
-                    ),
-                  ],
-                  selected: {_type},
-                  showSelectedIcon: false,
-                  onSelectionChanged: (selection) => setState(() {
-                    _type = selection.first;
-                  }),
-                ),
-                SizedBox(height: Spacing.lg),
-                TextField(
-                  controller: _amountController,
-                  autofocus: !widget.isEditing,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: InputDecoration(
-                    labelText: 'Amount',
-                    prefixText: '₹ ',
-                    errorText: _submitted && _amount == null
-                        ? 'Enter an amount above zero'
-                        : null,
+    return DiscardChangesGuard(
+      isDirty: _isDirty,
+      child: Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              Spacing.lg,
+              Spacing.lg,
+              Spacing.lg,
+              Spacing.lg,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.isEditing ? 'Edit recurring' : 'Add recurring',
+                    style: theme.textTheme.titleLarge,
                   ),
-                ),
-                SizedBox(height: Spacing.lg),
-                DropdownButtonFormField<String>(
-                  initialValue: _category,
-                  decoration: InputDecoration(
-                    labelText: 'Category',
-                    errorText: _submitted && _category == null
-                        ? 'Pick a category'
-                        : null,
-                  ),
-                  items: [
-                    for (final c in categories)
-                      DropdownMenuItem(value: c.name, child: Text(c.name)),
-                  ],
-                  onChanged: (value) => setState(() => _category = value),
-                ),
-                SizedBox(height: Spacing.lg),
-                TextField(
-                  controller: _noteController,
-                  decoration: const InputDecoration(labelText: 'Note (optional)'),
-                ),
-                SizedBox(height: Spacing.lg),
-                Text('Repeats', style: theme.textTheme.titleSmall),
-                SizedBox(height: Spacing.sm),
-                SegmentedButton<RecurrenceFrequency>(
-                  segments: const [
-                    ButtonSegment(
-                      value: RecurrenceFrequency.daily,
-                      label: Text('Daily'),
-                    ),
-                    ButtonSegment(
-                      value: RecurrenceFrequency.weekly,
-                      label: Text('Weekly'),
-                    ),
-                    ButtonSegment(
-                      value: RecurrenceFrequency.monthly,
-                      label: Text('Monthly'),
-                    ),
-                  ],
-                  selected: {_frequency},
-                  showSelectedIcon: false,
-                  onSelectionChanged: (selection) => setState(() {
-                    _frequency = selection.first;
-                  }),
-                ),
-                SizedBox(height: Spacing.lg),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _pickStartDate,
-                        icon: const Icon(Icons.calendar_today, size: 16),
-                        label: Text('Starts ${dateFormat.format(_startDate)}'),
+                  const SizedBox(height: Spacing.lg),
+                  SegmentedButton<TransactionType>(
+                    segments: const [
+                      ButtonSegment(
+                        value: TransactionType.expense,
+                        label: Text('Expense'),
                       ),
+                      ButtonSegment(
+                        value: TransactionType.income,
+                        label: Text('Income'),
+                      ),
+                    ],
+                    selected: {_type},
+                    showSelectedIcon: false,
+                    onSelectionChanged: (selection) => setState(() {
+                      _type = selection.first;
+                    }),
+                  ),
+                  const SizedBox(height: Spacing.lg),
+                  TextField(
+                    controller: _amountController,
+                    autofocus: !widget.isEditing,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
                     ),
-                    SizedBox(width: Spacing.sm),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _pickEndDate,
-                        icon: const Icon(Icons.calendar_today, size: 16),
-                        label: Text(
-                          _endDate == null
-                              ? 'No end date'
-                              : 'Ends ${dateFormat.format(_endDate!)}',
+                    decoration: InputDecoration(
+                      labelText: 'Amount',
+                      prefixText: '$currencySymbol ',
+                      errorText: _submitted && _amount == null
+                          ? 'Enter an amount above zero'
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(height: Spacing.lg),
+                  DropdownButtonFormField<String>(
+                    initialValue: _category,
+                    decoration: InputDecoration(
+                      labelText: 'Category',
+                      errorText: _submitted && _category == null
+                          ? 'Pick a category'
+                          : null,
+                    ),
+                    items: [
+                      for (final c in categories)
+                        DropdownMenuItem(value: c.name, child: Text(c.name)),
+                    ],
+                    onChanged: (value) => setState(() => _category = value),
+                  ),
+                  const SizedBox(height: Spacing.lg),
+                  TextField(
+                    controller: _noteController,
+                    decoration: const InputDecoration(
+                      labelText: 'Note (optional)',
+                    ),
+                  ),
+                  const SizedBox(height: Spacing.lg),
+                  Text('Repeats', style: theme.textTheme.titleSmall),
+                  const SizedBox(height: Spacing.sm),
+                  SegmentedButton<RecurrenceFrequency>(
+                    segments: const [
+                      ButtonSegment(
+                        value: RecurrenceFrequency.daily,
+                        label: Text('Daily'),
+                      ),
+                      ButtonSegment(
+                        value: RecurrenceFrequency.weekly,
+                        label: Text('Weekly'),
+                      ),
+                      ButtonSegment(
+                        value: RecurrenceFrequency.monthly,
+                        label: Text('Monthly'),
+                      ),
+                    ],
+                    selected: {_frequency},
+                    showSelectedIcon: false,
+                    onSelectionChanged: (selection) => setState(() {
+                      _frequency = selection.first;
+                    }),
+                  ),
+                  const SizedBox(height: Spacing.lg),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _pickStartDate,
+                          icon: const Icon(
+                            Icons.calendar_today,
+                            size: IconSize.sm,
+                          ),
+                          label: Text(
+                            'Starts ${dateFormat.format(_startDate)}',
+                          ),
                         ),
                       ),
+                      const SizedBox(width: Spacing.sm),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _pickEndDate,
+                          icon: const Icon(
+                            Icons.calendar_today,
+                            size: IconSize.sm,
+                          ),
+                          label: Text(
+                            _endDate == null
+                                ? 'No end date'
+                                : 'Ends ${dateFormat.format(_endDate!)}',
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (_endDate != null)
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: () => setState(() => _endDate = null),
+                        child: const Text('Clear end date'),
+                      ),
                     ),
-                  ],
-                ),
-                if (_endDate != null)
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(
-                      onPressed: () => setState(() => _endDate = null),
-                      child: const Text('Clear end date'),
+                  const SizedBox(height: Spacing.lg),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: _saving ? null : _submit,
+                      child: _saving
+                          ? const SizedBox(
+                              height: IconSize.md,
+                              width: IconSize.md,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Text(widget.isEditing ? 'Save' : 'Add'),
                     ),
                   ),
-                SizedBox(height: Spacing.lg),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: _saving ? null : _submit,
-                    child: _saving
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Text(widget.isEditing ? 'Save' : 'Add'),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

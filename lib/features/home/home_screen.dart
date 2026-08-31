@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_dimens.dart';
+import '../../core/theme/app_typography.dart';
 import '../../core/theme/app_elevation.dart';
 import '../../core/theme/app_motion.dart';
 import '../../core/theme/app_semantic_colors.dart';
@@ -12,6 +13,7 @@ import '../../models/transaction.dart';
 import '../../models/user_profile.dart';
 import '../../providers/profile_provider.dart';
 import '../../providers/transaction_provider.dart';
+import '../../providers/xp_engine_provider.dart' show LogTransactionResult;
 import '../../shared_widgets/animated_progress_bar.dart';
 import '../../shared_widgets/app_avatar.dart';
 import '../../shared_widgets/app_card.dart';
@@ -22,7 +24,25 @@ import '../../shared_widgets/skeleton.dart';
 import '../../shared_widgets/streak_calendar.dart';
 import '../../shared_widgets/transaction_tile.dart';
 import '../../shared_widgets/xp_bar.dart';
+import '../log_transaction/log_transaction_sheet.dart';
 import '../transactions/transaction_history_screen.dart';
+
+/// Opens the edit sheet for a specific transaction — previously tapping a
+/// recent row on Home landed on the unfiltered History *list* instead of
+/// that transaction, with no way to get from "I see it" to "I can edit it"
+/// in one tap. Mirrors `TransactionHistoryScreen._edit`.
+Future<void> _openTransactionDetail(
+  BuildContext context,
+  Transaction transaction,
+) async {
+  final result = await showModalBottomSheet<LogTransactionResult>(
+    context: context,
+    isScrollControlled: true,
+    builder: (_) => LogTransactionSheet(existing: transaction),
+  );
+  if (!context.mounted || result == null) return;
+  if (result.xpGained > 0) showXpGain(context, result.xpGained);
+}
 
 /// How many recent transactions Home shows before deferring to full history.
 const _kRecentCount = 4;
@@ -37,7 +57,12 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profile = ref.watch(profileProvider);
-    final transactions = ref.watch(transactionsProvider);
+    // Only watched to decide first-run vs. normal layout; per-card data
+    // below comes from providers that stay cheap regardless of history
+    // size instead of scanning this full list on every build.
+    final hasTransactions = ref.watch(
+      transactionsProvider.select((t) => t.isNotEmpty),
+    );
     final spentToday = ref.watch(todaysSpendProvider);
 
     if (profile == null) {
@@ -45,8 +70,6 @@ class HomeScreen extends ConsumerWidget {
     }
 
     final progress = levelProgressForXp(profile.currentXP);
-    final recent = [...transactions]
-      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
 
     return Scaffold(
       body: CustomScrollView(
@@ -57,20 +80,19 @@ class HomeScreen extends ConsumerWidget {
             titleSpacing: Spacing.lg,
           ),
           SliverPadding(
-            padding: EdgeInsets.fromLTRB(
+            padding: const EdgeInsets.fromLTRB(
               Spacing.lg,
               Spacing.md,
               Spacing.lg,
               Spacing.xxxl,
             ),
             sliver: SliverList.list(
-              children: transactions.isEmpty
+              children: !hasTransactions
                   ? [_FirstRun(onLogPressed: onLogPressed)]
                   : _cards(
                       context: context,
+                      ref: ref,
                       profile: profile,
-                      transactions: transactions,
-                      recent: recent,
                       spentToday: spentToday,
                       progress: progress,
                     ),
@@ -83,19 +105,26 @@ class HomeScreen extends ConsumerWidget {
 
   List<Widget> _cards({
     required BuildContext context,
+    required WidgetRef ref,
     required UserProfile profile,
-    required List<Transaction> transactions,
-    required List<Transaction> recent,
     required double spentToday,
     required LevelProgress progress,
   }) {
+    final recent = ref.watch(recentTransactionsProvider(_kRecentCount));
+    final loggedDays = ref.watch(loggedDaysProvider);
+    final monthToDate = ref.watch(monthToDateSpendProvider);
+
     final cards = <Widget>[
-      _StreakHero(profile: profile, transactions: transactions),
-      SizedBox(height: Spacing.md),
+      _StreakHero(profile: profile, loggedDays: loggedDays),
+      const SizedBox(height: Spacing.md),
       AppCard(child: XpBar(progress: progress)),
-      SizedBox(height: Spacing.md),
-      _SpendingCard(profile: profile, spentToday: spentToday, transactions: transactions),
-      SizedBox(height: Spacing.xl),
+      const SizedBox(height: Spacing.md),
+      _SpendingCard(
+        profile: profile,
+        spentToday: spentToday,
+        monthToDate: monthToDate,
+      ),
+      const SizedBox(height: Spacing.xl),
       SectionHeader(
         title: 'Recent',
         actionLabel: 'See all',
@@ -106,7 +135,7 @@ class HomeScreen extends ConsumerWidget {
         ),
       ),
       AppCard(
-        padding: EdgeInsets.symmetric(
+        padding: const EdgeInsets.symmetric(
           horizontal: Spacing.sm,
           vertical: Spacing.xs,
         ),
@@ -115,11 +144,7 @@ class HomeScreen extends ConsumerWidget {
             for (final t in recent.take(_kRecentCount))
               TransactionTile(
                 transaction: t,
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => const TransactionHistoryScreen(),
-                  ),
-                ),
+                onTap: () => _openTransactionDetail(context, t),
               ),
           ],
         ),
@@ -150,17 +175,18 @@ class _Greeting extends StatelessWidget {
     final theme = Theme.of(context);
     return Row(
       children: [
-        AppAvatar(emoji: profile.avatarId, size: 36, showRing: false),
-        SizedBox(width: Spacing.md),
+        AppAvatar(
+          emoji: profile.avatarId,
+          size: MedallionSize.avatarCompact,
+          showRing: false,
+        ),
+        const SizedBox(width: Spacing.md),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                _timeOfDayGreeting(),
-                style: theme.textTheme.bodySmall,
-              ),
+              Text(_timeOfDayGreeting(), style: theme.textTheme.bodySmall),
               Text(
                 profile.name,
                 maxLines: 1,
@@ -188,10 +214,10 @@ class _Greeting extends StatelessWidget {
 /// one of three identical cards. Here it gets the gold gradient, the animated
 /// flame and the oversized number — the only hero on the screen.
 class _StreakHero extends StatelessWidget {
-  const _StreakHero({required this.profile, required this.transactions});
+  const _StreakHero({required this.profile, required this.loggedDays});
 
   final UserProfile profile;
-  final List<Transaction> transactions;
+  final Set<DateTime> loggedDays;
 
   @override
   Widget build(BuildContext context) {
@@ -209,10 +235,10 @@ class _StreakHero extends StatelessWidget {
               const CelebrationAnimation(
                 asset: CelebrationAssets.streakFlame,
                 fallbackIcon: Icons.local_fire_department,
-                size: 56,
+                size: IconSize.hero,
                 repeat: true,
               ),
-              SizedBox(width: Spacing.sm),
+              const SizedBox(width: Spacing.sm),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
@@ -229,7 +255,7 @@ class _StreakHero extends StatelessWidget {
                     profile.currentStreak == 1 ? 'DAY' : 'DAYS',
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: semantics.onGold.withValues(alpha: 0.75),
-                      letterSpacing: 1.2,
+                      letterSpacing: kOverlineLetterSpacing,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
@@ -244,7 +270,7 @@ class _StreakHero extends StatelessWidget {
                     'BEST',
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: semantics.onGold.withValues(alpha: 0.7),
-                      letterSpacing: 1.1,
+                      letterSpacing: kOverlineLetterSpacing,
                     ),
                   ),
                   Text(
@@ -258,8 +284,31 @@ class _StreakHero extends StatelessWidget {
               ),
             ],
           ),
-          SizedBox(height: Spacing.lg),
-          StreakCalendar(transactions: transactions, onGold: true),
+          const SizedBox(height: Spacing.sm),
+          // Freezes were computed and persisted from day one but never
+          // surfaced anywhere — a user whose streak survived a missed day
+          // had no idea why, or that the grace only covers one gap a week.
+          Row(
+            children: [
+              Icon(
+                Icons.ac_unit,
+                size: IconSize.sm,
+                color: semantics.onGold.withValues(alpha: 0.85),
+              ),
+              const SizedBox(width: Spacing.xs),
+              Text(
+                profile.streakFreezesLeft > 0
+                    ? '${profile.streakFreezesLeft} streak freeze available '
+                          'this week'
+                    : 'No streak freezes left this week',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: semantics.onGold.withValues(alpha: 0.85),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: Spacing.md),
+          StreakCalendar(loggedDays: loggedDays, onGold: true),
         ],
       ),
     );
@@ -270,12 +319,12 @@ class _SpendingCard extends StatelessWidget {
   const _SpendingCard({
     required this.profile,
     required this.spentToday,
-    required this.transactions,
+    required this.monthToDate,
   });
 
   final UserProfile profile;
   final double spentToday;
-  final List<Transaction> transactions;
+  final double monthToDate;
 
   @override
   Widget build(BuildContext context) {
@@ -286,13 +335,6 @@ class _SpendingCard extends StatelessWidget {
     final now = DateTime.now();
     final dailyBudget = budget == null ? null : dailyBudgetFor(budget, now);
     final isOver = dailyBudget != null && spentToday > dailyBudget;
-
-    final monthToDate = transactions
-        .where((t) =>
-            t.type == TransactionType.expense &&
-            t.timestamp.year == now.year &&
-            t.timestamp.month == now.month)
-        .fold<double>(0, (sum, t) => sum + t.amount);
 
     return AppCard(
       child: Column(
@@ -312,13 +354,13 @@ class _SpendingCard extends StatelessWidget {
                 ),
             ],
           ),
-          SizedBox(height: Spacing.sm),
+          const SizedBox(height: Spacing.sm),
           Row(
             crossAxisAlignment: CrossAxisAlignment.baseline,
             textBaseline: TextBaseline.alphabetic,
             children: [
               Text(
-                formatCurrency(spentToday),
+                formatCurrency(spentToday, currencyCode: profile.currencyCode),
                 style: theme.textTheme.headlineSmall?.copyWith(
                   color: isOver ? semantics.expenseInk : null,
                   fontWeight: FontWeight.w800,
@@ -326,7 +368,7 @@ class _SpendingCard extends StatelessWidget {
               ),
               if (dailyBudget != null)
                 Text(
-                  ' / ${formatCurrency(dailyBudget)}',
+                  ' / ${formatCurrency(dailyBudget, currencyCode: profile.currencyCode)}',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -334,32 +376,29 @@ class _SpendingCard extends StatelessWidget {
             ],
           ),
           if (dailyBudget != null) ...[
-            SizedBox(height: Spacing.md),
+            const SizedBox(height: Spacing.md),
             AnimatedProgressBar(
               value: dailyBudget == 0 ? 0 : spentToday / dailyBudget,
               variant: ProgressVariant.budget,
               isOver: isOver,
             ),
           ],
-          SizedBox(height: Spacing.md),
-          Divider(height: 1, indent: 0, endIndent: 0),
-          SizedBox(height: Spacing.md),
+          const SizedBox(height: Spacing.md),
+          const Divider(height: 1, indent: 0, endIndent: 0),
+          const SizedBox(height: Spacing.md),
           Row(
             children: [
-              Text(
-                'This month',
-                style: theme.textTheme.bodySmall,
-              ),
+              Text('This month', style: theme.textTheme.bodySmall),
               const Spacer(),
               Text(
-                formatCurrency(monthToDate),
+                formatCurrency(monthToDate, currencyCode: profile.currencyCode),
                 style: theme.textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.w700,
                 ),
               ),
               if (budget != null)
                 Text(
-                  ' / ${formatCurrency(budget)}',
+                  ' / ${formatCurrency(budget, currencyCode: profile.currencyCode)}',
                   style: theme.textTheme.bodySmall,
                 ),
             ],
@@ -382,7 +421,7 @@ class _FirstRun extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.only(top: Spacing.xxl),
+      padding: const EdgeInsets.only(top: Spacing.xxl),
       child: EmptyState(
         icon: Icons.rocket_launch_outlined,
         title: 'Log your first transaction',

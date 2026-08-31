@@ -52,4 +52,22 @@ abstract class AppMotion {
     final clamped = index < 0 ? 0 : (index > maxItems ? maxItems : index);
     return stagger * clamped;
   }
+
+  /// Per-item delay for celebration dialogs revealing multiple badges/quests
+  /// (badge-unlock, quest-complete) — deliberately slower than [stagger]:
+  /// a reward moment should feel like each item lands one at a time, not
+  /// like a list populating.
+  static const Duration celebrationStagger = Duration(milliseconds: 120);
+
+  /// The shimmer sweep loop on a [Skeleton] placeholder.
+  static const Duration shimmer = Duration(milliseconds: 1400);
+
+  /// Confetti burst duration ([CelebrationBurst]).
+  static const Duration confetti = Duration(milliseconds: 700);
+
+  /// [BounceIn]'s elastic scale-in.
+  static const Duration bounce = Duration(milliseconds: 550);
+
+  /// How long an XP-gain chip ([showXpGain]) stays on screen before fading.
+  static const Duration xpChipLifetime = Duration(milliseconds: 1800);
 }

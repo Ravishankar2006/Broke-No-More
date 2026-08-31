@@ -20,8 +20,13 @@ import 'transaction_repository.dart';
 /// the one guaranteed checkpoint, exactly like
 /// [QuestRepository.expireOverdueQuests].
 ///
-/// Runs before `runApp`, so it uses repositories directly rather than Riverpod
-/// providers — nothing is watching yet.
+/// Uses repositories directly rather than Riverpod providers, so it has no
+/// dependency on anything being watching. That means a caller running this
+/// *after* `runApp` — as `main.dart`'s `_RepairScheduler` does, to keep this
+/// off the critical path to the first frame — is responsible for
+/// invalidating whatever providers it may have touched (profile,
+/// transactions, quests, badges) once it resolves; nothing here does that on
+/// its own.
 ///
 /// Deliberately silent: badges unlocked here appear on the shelf without a
 /// celebration dialog, since the user didn't just do anything. A dialog on cold
@@ -73,8 +78,9 @@ Future<void> repairGamificationState() async {
   );
 
   final badgeRepo = BadgeRepository();
-  final questsCompleted =
-      allQuests.where((q) => q.status == QuestStatus.completed).length;
+  final questsCompleted = allQuests
+      .where((q) => q.status == QuestStatus.completed)
+      .length;
   final newlyUnlocked = evaluateNewlyUnlockedBadges(
     transactionCount: transactions.length,
     currentStreak: replay.currentStreak,

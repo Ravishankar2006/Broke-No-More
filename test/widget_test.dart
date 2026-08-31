@@ -38,22 +38,27 @@ void main() {
     await Hive.openBox<Badge>(HiveBoxes.badges);
     await Hive.openBox<RecurringTransaction>(HiveBoxes.recurringTransactions);
     await Hive.openBox<dynamic>(HiveBoxes.appState);
-    final categoryBox =
-        await Hive.openBox<CategoryRecord>(HiveBoxes.categories);
-    await categoryBox.add(CategoryRecord(
-      id: 'test-food',
-      name: 'Food',
-      iconId: 'restaurant',
-      type: TransactionType.expense,
-      sortOrder: 0,
-    ));
-    await categoryBox.add(CategoryRecord(
-      id: 'test-allowance',
-      name: 'Allowance',
-      iconId: 'wallet',
-      type: TransactionType.income,
-      sortOrder: 0,
-    ));
+    final categoryBox = await Hive.openBox<CategoryRecord>(
+      HiveBoxes.categories,
+    );
+    await categoryBox.add(
+      CategoryRecord(
+        id: 'test-food',
+        name: 'Food',
+        iconId: 'restaurant',
+        type: TransactionType.expense,
+        sortOrder: 0,
+      ),
+    );
+    await categoryBox.add(
+      CategoryRecord(
+        id: 'test-allowance',
+        name: 'Allowance',
+        iconId: 'wallet',
+        type: TransactionType.income,
+        sortOrder: 0,
+      ),
+    );
   });
 
   tearDown(() async {
@@ -61,8 +66,9 @@ void main() {
     await tempDir.delete(recursive: true);
   });
 
-  testWidgets('shows onboarding when no local profile exists yet',
-      (WidgetTester tester) async {
+  testWidgets('shows onboarding when no local profile exists yet', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(const ProviderScope(child: BrokeNoMoreApp()));
     await tester.pumpAndSettle();
 
@@ -71,49 +77,47 @@ void main() {
     expect(find.text('Continue'), findsOneWidget);
   });
 
-  testWidgets(
-    'completing onboarding lands on the home dashboard',
-    (WidgetTester tester) async {
-      await tester.pumpWidget(const ProviderScope(child: BrokeNoMoreApp()));
-      await tester.pumpAndSettle();
+  testWidgets('completing onboarding lands on the home dashboard', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(const ProviderScope(child: BrokeNoMoreApp()));
+    await tester.pumpAndSettle();
 
-      // Page 1 of 3 — welcome.
-      await tester.tap(find.text('Continue'));
-      await tester.pumpAndSettle();
+    // Page 1 of 3 — welcome.
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
 
-      // Page 2 — name and avatar.
-      await tester.enterText(find.byType(TextField).first, 'Riya');
-      await tester.pump();
-      // Drop focus so the cursor stops blinking — a focused TextField
-      // schedules frames forever and would make pumpAndSettle() hang.
-      FocusManager.instance.primaryFocus?.unfocus();
-      await tester.pump();
+    // Page 2 — name and avatar.
+    await tester.enterText(find.byType(TextField).first, 'Riya');
+    await tester.pump();
+    // Drop focus so the cursor stops blinking — a focused TextField
+    // schedules frames forever and would make pumpAndSettle() hang.
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pump();
 
-      await tester.tap(find.text('Continue'));
-      await tester.pumpAndSettle();
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
 
-      // Page 3 — budget, then submit.
-      expect(find.text('Start'), findsOneWidget);
+    // Page 3 — budget, then submit.
+    expect(find.text('Start'), findsOneWidget);
 
-      // Profile creation goes through Hive, which does real dart:io file
-      // writes. Those never resolve on flutter_test's fake clock unless the
-      // awaiting call happens inside runAsync — otherwise the tap's
-      // onPressed future just hangs forever and so does tearDown after it.
-      await tester.runAsync(() async {
-        await tester.tap(find.text('Start'));
-        await Future<void>.delayed(const Duration(milliseconds: 300));
-      });
-      await tester.pump();
-      // Home staggers its card entrance with flutter_animate, which implements
-      // per-item delay as a Timer. Pump past the longest stagger so none are
-      // left pending when the test ends.
-      await tester.pump(const Duration(milliseconds: 600));
+    // Profile creation goes through Hive, which does real dart:io file
+    // writes. Those never resolve on flutter_test's fake clock unless the
+    // awaiting call happens inside runAsync — otherwise the tap's
+    // onPressed future just hangs forever and so does tearDown after it.
+    await tester.runAsync(() async {
+      await tester.tap(find.text('Start'));
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+    });
+    await tester.pump();
+    // Home staggers its card entrance with flutter_animate, which implements
+    // per-item delay as a Timer. Pump past the longest stagger so none are
+    // left pending when the test ends.
+    await tester.pump(const Duration(milliseconds: 600));
 
-      // The home header shows a time-of-day greeting above the name rather
-      // than a single "Hey, {name}" string. Assert on the name, which is the
-      // part that doesn't depend on when the suite runs.
-      expect(find.text('Riya'), findsOneWidget);
-    },
-    timeout: const Timeout(Duration(seconds: 30)),
-  );
+    // The home header shows a time-of-day greeting above the name rather
+    // than a single "Hey, {name}" string. Assert on the name, which is the
+    // part that doesn't depend on when the suite runs.
+    expect(find.text('Riya'), findsOneWidget);
+  }, timeout: const Timeout(Duration(seconds: 30)));
 }

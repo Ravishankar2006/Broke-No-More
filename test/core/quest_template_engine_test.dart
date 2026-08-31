@@ -40,7 +40,10 @@ void main() {
       );
 
       expect(candidates, hasLength(2));
-      expect(candidates.map((c) => c.type), containsAll([QuestType.streak, QuestType.count]));
+      expect(
+        candidates.map((c) => c.type),
+        containsAll([QuestType.streak, QuestType.count]),
+      );
     });
 
     test('streak candidate targets a few days beyond the current streak', () {
@@ -49,7 +52,9 @@ void main() {
         currentStreak: 2,
         now: today,
       );
-      final streakCandidate = candidates.firstWhere((c) => c.type == QuestType.streak);
+      final streakCandidate = candidates.firstWhere(
+        (c) => c.type == QuestType.streak,
+      );
       expect(streakCandidate.targetValue, 5);
       expect(streakCandidate.title, isNot(contains('{')));
     });
@@ -60,7 +65,9 @@ void main() {
         currentStreak: 0,
         now: today,
       );
-      final countCandidate = candidates.firstWhere((c) => c.type == QuestType.count);
+      final countCandidate = candidates.firstWhere(
+        (c) => c.type == QuestType.count,
+      );
       expect(countCandidate.targetValue, greaterThanOrEqualTo(3));
       expect(countCandidate.title, isNot(contains('{')));
     });
@@ -85,6 +92,127 @@ void main() {
     });
   });
 
+  group('with only this-week history (no prior-week baseline)', () {
+    test(
+      'suggests avoiding the top-spending category as a third candidate',
+      () {
+        final transactions = [
+          _expense('Food', 300, today.subtract(const Duration(days: 1))),
+          _expense('Transport', 50, today.subtract(const Duration(days: 2))),
+        ];
+
+        final candidates = generateQuestCandidates(
+          allTransactions: transactions,
+          currentStreak: 1,
+          now: today,
+          maxCandidates: 3,
+        );
+
+        // Without the starter fallback this would be capped at 2
+        // (streak + count) — a brand-new user should still see 2-3.
+        expect(candidates, hasLength(3));
+        final starter = candidates.firstWhere((c) => c.category != null);
+        expect(starter.type, QuestType.categoryAvoid);
+        expect(starter.category, 'Food'); // the larger of the two amounts
+        expect(starter.title, contains('Food'));
+        expect(starter.xpReward, 100);
+      },
+    );
+
+    test('omits the starter candidate when it is already active', () {
+      final transactions = [
+        _expense('Food', 300, today.subtract(const Duration(days: 1))),
+      ];
+
+      final candidates = generateQuestCandidates(
+        allTransactions: transactions,
+        currentStreak: 1,
+        now: today,
+        activeQuests: [_activeQuest(QuestType.categoryAvoid, 'Food', today)],
+      );
+
+      expect(candidates.any((c) => c.category == 'Food'), isFalse);
+    });
+  });
+
+  group('quest reward band', () {
+    test('every generated candidate falls within the PRD\'s 50-100 range', () {
+      final priorWeek = today.subtract(const Duration(days: 14));
+      final transactions = [
+        for (final category in ['Food', 'Transport']) ...[
+          _expense(category, 100, priorWeek),
+          _expense(category, 500, today.subtract(const Duration(days: 1))),
+        ],
+      ];
+
+      final candidates = generateQuestCandidates(
+        allTransactions: transactions,
+        currentStreak: 5,
+        now: today,
+        maxCandidates: 4,
+      );
+
+      for (final candidate in candidates) {
+        expect(candidate.xpReward, inInclusiveRange(50, 100));
+      }
+      // The top of the band must actually be reachable, not just permitted
+      // — a categoryAvoid candidate should hit exactly 100.
+      expect(candidates.any((c) => c.type == QuestType.categoryAvoid), isTrue);
+      expect(
+        candidates
+            .firstWhere((c) => c.type == QuestType.categoryAvoid)
+            .xpReward,
+        100,
+      );
+    });
+  });
+
+  group('QuestCandidate.withTarget', () {
+    test('regenerates the title around the new target, dropping stale '
+        'duration-specific wording', () {
+      const original = QuestCandidate(
+        title: 'Spend under ₹400 on Food this week',
+        type: QuestType.budgetLimit,
+        targetValue: 400,
+        xpReward: 75,
+        category: 'Food',
+      );
+
+      final customized = original.withTarget(800, currencySymbol: r'$');
+
+      expect(customized.targetValue, 800);
+      expect(customized.title, contains(r'$800'));
+      expect(customized.title, contains('Food'));
+      expect(customized.title, isNot(contains('this week')));
+      expect(customized.type, original.type);
+      expect(customized.category, original.category);
+      expect(customized.xpReward, original.xpReward);
+    });
+
+    test('produces a clean title for every quest type', () {
+      const base = QuestCandidate(
+        title: 'placeholder',
+        type: QuestType.streak,
+        targetValue: 1,
+        xpReward: 50,
+      );
+      for (final type in QuestType.values) {
+        final candidate = QuestCandidate(
+          title: base.title,
+          type: type,
+          targetValue: base.targetValue,
+          xpReward: base.xpReward,
+          category: type == QuestType.streak || type == QuestType.count
+              ? null
+              : 'Food',
+        );
+        final customized = candidate.withTarget(5, currencySymbol: '₹');
+        expect(customized.title, contains('5'));
+        expect(customized.title, isNot(contains('{')));
+      }
+    });
+  });
+
   group('with an overspending category', () {
     test('generates a category-based candidate referencing that category', () {
       final priorWeek = today.subtract(const Duration(days: 14));
@@ -99,31 +227,65 @@ void main() {
         now: today,
       );
 
-      final categoryCandidate = candidates.firstWhere((c) => c.category == 'Food');
-      expect(categoryCandidate.type,
-          anyOf(QuestType.categoryAvoid, QuestType.budgetLimit));
+      final categoryCandidate = candidates.firstWhere(
+        (c) => c.category == 'Food',
+      );
+      expect(
+        categoryCandidate.type,
+        anyOf(QuestType.categoryAvoid, QuestType.budgetLimit),
+      );
       expect(categoryCandidate.title, contains('Food'));
       expect(categoryCandidate.title, isNot(contains('{')));
     });
 
-    test('fills remaining slots with general candidates when few categories offend', () {
-      final priorWeek = today.subtract(const Duration(days: 14));
-      final transactions = [
-        _expense('Food', 100, priorWeek),
-        _expense('Food', 500, today.subtract(const Duration(days: 1))),
-      ];
+    test(
+      'routes the caller-supplied currency symbol into a budgetLimit title',
+      () {
+        final priorWeek = today.subtract(const Duration(days: 14));
+        final transactions = [
+          for (final category in ['Food', 'Transport']) ...[
+            _expense(category, 100, priorWeek),
+            _expense(category, 500, today.subtract(const Duration(days: 1))),
+          ],
+        ];
 
-      final candidates = generateQuestCandidates(
-        allTransactions: transactions,
-        currentStreak: 3,
-        now: today,
-        maxCandidates: 3,
-      );
+        final candidates = generateQuestCandidates(
+          allTransactions: transactions,
+          currentStreak: 0,
+          now: today,
+          maxCandidates: 2,
+          currencySymbol: r'$',
+        );
 
-      expect(candidates, hasLength(3));
-      expect(candidates.where((c) => c.category == 'Food'), hasLength(1));
-      expect(candidates.where((c) => c.category == null), hasLength(2));
-    });
+        final budgetLimitCandidate = candidates.firstWhere(
+          (c) => c.type == QuestType.budgetLimit,
+        );
+        expect(budgetLimitCandidate.title, contains(r'$'));
+        expect(budgetLimitCandidate.title, isNot(contains('₹')));
+      },
+    );
+
+    test(
+      'fills remaining slots with general candidates when few categories offend',
+      () {
+        final priorWeek = today.subtract(const Duration(days: 14));
+        final transactions = [
+          _expense('Food', 100, priorWeek),
+          _expense('Food', 500, today.subtract(const Duration(days: 1))),
+        ];
+
+        final candidates = generateQuestCandidates(
+          allTransactions: transactions,
+          currentStreak: 3,
+          now: today,
+          maxCandidates: 3,
+        );
+
+        expect(candidates, hasLength(3));
+        expect(candidates.where((c) => c.category == 'Food'), hasLength(1));
+        expect(candidates.where((c) => c.category == null), hasLength(2));
+      },
+    );
 
     test('never exceeds maxCandidates even with many offending categories', () {
       final priorWeek = today.subtract(const Duration(days: 14));
@@ -170,7 +332,9 @@ void main() {
         currentStreak: 0,
         now: today,
       );
-      final foodCandidate = candidatesWithNoActive.firstWhere((c) => c.category == 'Food');
+      final foodCandidate = candidatesWithNoActive.firstWhere(
+        (c) => c.category == 'Food',
+      );
 
       final candidatesWithActive = generateQuestCandidates(
         allTransactions: transactions,

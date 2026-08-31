@@ -27,9 +27,7 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
     required this.chartBar,
     required this.chartPalette,
     required this.goldSurface,
-    required this.goldBorder,
     required this.goldRing,
-    required this.goldHalo,
     required this.streakDotBorder,
     required this.lockedIcon,
     required this.lockedLabel,
@@ -63,14 +61,8 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
   /// celebration avatars, XP chips.
   final Color goldSurface;
 
-  /// Border on a filled gold surface — pairs with [goldSurface].
-  final Color goldBorder;
-
   /// Ring around the profile avatar and level medallions.
   final Color goldRing;
-
-  /// Soft halo behind celebration icons (level-up bolt, badge medallion).
-  final Color goldHalo;
 
   /// Outline of an *un*completed day in the streak calendar.
   final Color streakDotBorder;
@@ -100,9 +92,7 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
     chartBar: AppPalette.indigo600,
     chartPalette: AppPalette.chartLight,
     goldSurface: Color(0x26F5B301), // gold @ 0.15
-    goldBorder: Color(0x66F5B301), // gold @ 0.40
     goldRing: Color(0x80F5B301), // gold @ 0.50
-    goldHalo: Color(0x29F5B301), // gold @ 0.16
     streakDotBorder: Color(0x59F5B301), // gold @ 0.35
     lockedIcon: Color(0x7355596B), // onSurfaceVariantLight @ 0.45
     lockedLabel: Color(0x9955596B), // onSurfaceVariantLight @ 0.60
@@ -126,9 +116,7 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
     chartBar: AppPalette.indigoLight400,
     chartPalette: AppPalette.chartDark,
     goldSurface: Color(0x33F5B301), // gold @ 0.20 — needs more on a dark canvas
-    goldBorder: Color(0x73F5B301), // gold @ 0.45
     goldRing: Color(0x8CF5B301), // gold @ 0.55
-    goldHalo: Color(0x33F5B301), // gold @ 0.20
     streakDotBorder: Color(0x66F5B301), // gold @ 0.40
     lockedIcon: Color(0x73A3AAC0), // onSurfaceVariantDark @ 0.45
     lockedLabel: Color(0x99A3AAC0), // onSurfaceVariantDark @ 0.60
@@ -153,9 +141,7 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
     Color? chartBar,
     List<Color>? chartPalette,
     Color? goldSurface,
-    Color? goldBorder,
     Color? goldRing,
-    Color? goldHalo,
     Color? streakDotBorder,
     Color? lockedIcon,
     Color? lockedLabel,
@@ -178,9 +164,7 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
       chartBar: chartBar ?? this.chartBar,
       chartPalette: chartPalette ?? this.chartPalette,
       goldSurface: goldSurface ?? this.goldSurface,
-      goldBorder: goldBorder ?? this.goldBorder,
       goldRing: goldRing ?? this.goldRing,
-      goldHalo: goldHalo ?? this.goldHalo,
       streakDotBorder: streakDotBorder ?? this.streakDotBorder,
       lockedIcon: lockedIcon ?? this.lockedIcon,
       lockedLabel: lockedLabel ?? this.lockedLabel,
@@ -212,9 +196,7 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
           ? chartPalette
           : other.chartPalette, // discrete, not interpolated
       goldSurface: Color.lerp(goldSurface, other.goldSurface, t)!,
-      goldBorder: Color.lerp(goldBorder, other.goldBorder, t)!,
       goldRing: Color.lerp(goldRing, other.goldRing, t)!,
-      goldHalo: Color.lerp(goldHalo, other.goldHalo, t)!,
       streakDotBorder: Color.lerp(streakDotBorder, other.streakDotBorder, t)!,
       lockedIcon: Color.lerp(lockedIcon, other.lockedIcon, t)!,
       lockedLabel: Color.lerp(lockedLabel, other.lockedLabel, t)!,

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,11 +9,40 @@ import '../../core/theme/app_elevation.dart';
 import '../../core/theme/app_motion.dart';
 import '../../core/theme/app_semantic_colors.dart';
 import '../../core/utils/category_icons.dart';
+import '../../core/utils/currency_catalog.dart';
 import '../../core/utils/date_helpers.dart';
 import '../../models/category_record.dart';
 import '../../models/transaction.dart';
 import '../../providers/category_provider.dart';
+import '../../providers/profile_provider.dart';
+import '../../providers/transaction_provider.dart';
 import '../../providers/xp_engine_provider.dart';
+import '../../shared_widgets/celebration_effects.dart';
+import '../../shared_widgets/discard_changes_guard.dart';
+
+/// Round, currency-agnostic amounts for the quick-entry chips — not tuned
+/// per currency (that would need a table of "sensible round numbers" per
+/// currency this app has no data to justify), just fast taps for the
+/// common small-to-medium expense sizes.
+const List<double> _kQuickAmounts = [50, 100, 200, 500, 1000];
+
+/// Blocks anything that can't become a valid amount as the user types —
+/// "1.2.3" or a third decimal digit previously stayed typable and were
+/// only ever caught at submit time.
+class _DecimalAmountFormatter extends TextInputFormatter {
+  static final _pattern = RegExp(r'^\d*\.?\d{0,2}$');
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    if (newValue.text.isEmpty || _pattern.hasMatch(newValue.text)) {
+      return newValue;
+    }
+    return oldValue;
+  }
+}
 
 /// Log a new transaction, or edit an existing one.
 ///
@@ -80,6 +111,20 @@ class _LogTransactionSheetState extends ConsumerState<LogTransactionSheet> {
     super.dispose();
   }
 
+  bool get _isDirty {
+    final existing = widget.existing;
+    if (existing == null) {
+      return _amountController.text.trim().isNotEmpty ||
+          _category != null ||
+          _noteController.text.trim().isNotEmpty;
+    }
+    return _amountController.text.trim() != _trimAmount(existing.amount) ||
+        _type != existing.type ||
+        _category?.name != existing.category ||
+        _noteController.text.trim() != (existing.note ?? '') ||
+        _date != existing.timestamp;
+  }
+
   double? get _amount {
     final parsed = double.tryParse(_amountController.text.trim());
     if (parsed == null || parsed <= 0) return null;
@@ -118,10 +163,14 @@ class _LogTransactionSheetState extends ConsumerState<LogTransactionSheet> {
     });
   }
 
-  Future<void> _submit() async {
+  /// [addAnother] keeps the sheet open and resets amount/category/note for
+  /// a second entry instead of popping — splitting one shopping trip into
+  /// several categories previously meant closing and reopening the sheet
+  /// each time.
+  Future<void> _submit({bool addAnother = false}) async {
     setState(() => _submitted = true);
     if (!_canSubmit) {
-      HapticFeedback.heavyImpact();
+      unawaited(HapticFeedback.heavyImpact());
       return;
     }
 
@@ -149,7 +198,21 @@ class _LogTransactionSheetState extends ConsumerState<LogTransactionSheet> {
             );
 
       if (!mounted) return;
-      Navigator.of(context).pop(result);
+      if (addAnother) {
+        if (result.xpGained > 0) showXpGain(context, result.xpGained);
+        unawaited(HapticFeedback.lightImpact());
+        setState(() {
+          _amountController.clear();
+          _noteController.clear();
+          _category = null;
+          _submitted = false;
+          _saving = false;
+          // Type and date carry over — a multi-item receipt is usually the
+          // same type logged on the same day, one category at a time.
+        });
+      } else {
+        Navigator.of(context).pop(result);
+      }
     } catch (_) {
       // The orchestrator throws on a re-entrant mutation or a disk error.
       // Without this, `_saving` stayed true forever and the Save button
@@ -158,9 +221,7 @@ class _LogTransactionSheetState extends ConsumerState<LogTransactionSheet> {
       if (!mounted) return;
       setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Couldn't save — please try again."),
-        ),
+        const SnackBar(content: Text("Couldn't save — please try again.")),
       );
     }
   }
@@ -174,6 +235,10 @@ class _LogTransactionSheetState extends ConsumerState<LogTransactionSheet> {
     final categories = _type == TransactionType.expense
         ? ref.watch(expenseCategoriesProvider)
         : ref.watch(incomeCategoriesProvider);
+    final recentCategoryNames = ref.watch(recentCategoryNamesProvider(_type));
+    final currencySymbol = currencyInfoFor(
+      ref.watch(currentCurrencyCodeProvider),
+    ).symbol;
 
     // Re-attach the edited transaction's category once the list is available.
     if (_pendingCategoryName != null) {
@@ -190,170 +255,205 @@ class _LogTransactionSheetState extends ConsumerState<LogTransactionSheet> {
         ? semantics.expense
         : semantics.income;
 
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
-      child: SafeArea(
-        top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(height: Spacing.md),
-            Center(
-              child: Container(
-                width: 40,
-                height: 5,
-                decoration: BoxDecoration(
-                  color: theme.dividerColor,
-                  borderRadius: BorderRadius.circular(AppRadius.pill),
+    return DiscardChangesGuard(
+      isDirty: _isDirty,
+      child: Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: Spacing.md),
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: theme.dividerColor,
+                    borderRadius: BorderRadius.circular(AppRadius.pill),
+                  ),
                 ),
               ),
-            ),
-            SizedBox(height: Spacing.lg),
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: Spacing.lg),
-              child: _TypeToggle(
-                type: _type,
-                onChanged: (type) {
-                  HapticFeedback.selectionClick();
-                  setState(() {
-                    _type = type;
-                    _category = null;
-                  });
-                },
+              const SizedBox(height: Spacing.lg),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: Spacing.lg),
+                child: _TypeToggle(
+                  type: _type,
+                  onChanged: (type) {
+                    HapticFeedback.selectionClick();
+                    setState(() {
+                      _type = type;
+                      _category = null;
+                    });
+                  },
+                ),
               ),
-            ),
-            SizedBox(height: Spacing.xl),
+              const SizedBox(height: Spacing.xl),
 
-            // The amount, as the hero.
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: Spacing.lg),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.baseline,
-                    textBaseline: TextBaseline.alphabetic,
-                    children: [
-                      Text(
-                        '₹',
-                        style: theme.textTheme.headlineMedium?.copyWith(
-                          color: cs.onSurfaceVariant,
+              // The amount, as the hero.
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: Spacing.lg),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        Text(
+                          currencySymbol,
+                          style: theme.textTheme.headlineMedium?.copyWith(
+                            color: cs.onSurfaceVariant,
+                          ),
                         ),
-                      ),
-                      SizedBox(width: Spacing.sm),
-                      // IntrinsicWidth alone collapses to the hint's width, so
-                      // an empty field rendered as a bare cursor next to the
-                      // rupee sign and looked broken. A minimum keeps the
-                      // target tappable and the zero legible.
-                      ConstrainedBox(
-                        constraints: const BoxConstraints(minWidth: 90),
-                        child: IntrinsicWidth(
-                          child: TextField(
-                            controller: _amountController,
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
-                            autofocus: !widget.isEditing,
-                            textAlign: TextAlign.center,
-                            style: theme.textTheme.displaySmall?.copyWith(
-                              fontWeight: FontWeight.w800,
-                              color: accent,
-                            ),
-                            decoration: InputDecoration(
-                              hintText: '0',
-                              filled: false,
-                              border: InputBorder.none,
-                              enabledBorder: InputBorder.none,
-                              focusedBorder: InputBorder.none,
-                              contentPadding: EdgeInsets.zero,
-                              isDense: true,
-                              hintStyle: theme.textTheme.displaySmall?.copyWith(
+                        const SizedBox(width: Spacing.sm),
+                        // IntrinsicWidth alone collapses to the hint's width, so
+                        // an empty field rendered as a bare cursor next to the
+                        // rupee sign and looked broken. A minimum keeps the
+                        // target tappable and the zero legible.
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(minWidth: 90),
+                          child: IntrinsicWidth(
+                            child: TextField(
+                              controller: _amountController,
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                  ),
+                              inputFormatters: [_DecimalAmountFormatter()],
+                              autofocus: !widget.isEditing,
+                              textAlign: TextAlign.center,
+                              style: theme.textTheme.displaySmall?.copyWith(
                                 fontWeight: FontWeight.w800,
-                                color: cs.onSurfaceVariant.withValues(
-                                  alpha: 0.7,
-                                ),
+                                color: accent,
+                              ),
+                              decoration: InputDecoration(
+                                hintText: '0',
+                                filled: false,
+                                border: InputBorder.none,
+                                enabledBorder: InputBorder.none,
+                                focusedBorder: InputBorder.none,
+                                contentPadding: EdgeInsets.zero,
+                                isDense: true,
+                                hintStyle: theme.textTheme.displaySmall
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.w800,
+                                      color: cs.onSurfaceVariant.withValues(
+                                        alpha: 0.7,
+                                      ),
+                                    ),
                               ),
                             ),
                           ),
                         ),
+                      ],
+                    ),
+                    if (_amountError != null) ...[
+                      const SizedBox(height: Spacing.sm),
+                      Text(
+                        _amountError!,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: cs.error,
+                        ),
                       ),
                     ],
-                  ),
-                  if (_amountError != null) ...[
-                    SizedBox(height: Spacing.sm),
-                    Text(
-                      _amountError!,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: cs.error,
-                      ),
+                    const SizedBox(height: Spacing.md),
+                    _DateChip(date: _date, onTap: _pickDate),
+                    const SizedBox(height: Spacing.md),
+                    _QuickAmountRow(
+                      currencySymbol: currencySymbol,
+                      onSelected: (amount) {
+                        HapticFeedback.selectionClick();
+                        _amountController.text =
+                            amount == amount.roundToDouble()
+                            ? amount.toStringAsFixed(0)
+                            : amount.toStringAsFixed(2);
+                      },
                     ),
                   ],
-                  SizedBox(height: Spacing.md),
-                  _DateChip(date: _date, onTap: _pickDate),
-                ],
+                ),
               ),
-            ),
-            SizedBox(height: Spacing.xl),
+              const SizedBox(height: Spacing.xl),
 
-            // Categories as a scrollable icon grid.
-            Flexible(
-              child: _CategoryGrid(
-                categories: categories,
-                selected: _category,
-                showError: _submitted && _category == null,
-                onSelected: (category) {
-                  HapticFeedback.selectionClick();
-                  setState(() => _category = category);
-                },
+              // Categories as a scrollable icon grid.
+              Flexible(
+                child: _CategoryGrid(
+                  categories: categories,
+                  recentNames: recentCategoryNames,
+                  selected: _category,
+                  showError: _submitted && _category == null,
+                  onSelected: (category) {
+                    HapticFeedback.selectionClick();
+                    setState(() => _category = category);
+                  },
+                ),
               ),
-            ),
 
-            Padding(
-              padding: EdgeInsets.fromLTRB(
-                Spacing.lg,
-                Spacing.lg,
-                Spacing.lg,
-                Spacing.lg,
-              ),
-              child: Column(
-                children: [
-                  TextField(
-                    controller: _noteController,
-                    textCapitalization: TextCapitalization.sentences,
-                    decoration: const InputDecoration(
-                      hintText: 'Note (optional)',
-                      prefixIcon: Icon(Icons.notes, size: 20),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  Spacing.lg,
+                  Spacing.lg,
+                  Spacing.lg,
+                  Spacing.lg,
+                ),
+                child: Column(
+                  children: [
+                    TextField(
+                      controller: _noteController,
+                      textCapitalization: TextCapitalization.sentences,
+                      decoration: const InputDecoration(
+                        hintText: 'Note (optional)',
+                        prefixIcon: Icon(Icons.notes, size: IconSize.md),
+                      ),
                     ),
-                  ),
-                  SizedBox(height: Spacing.lg),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
-                      onPressed: _saving ? null : _submit,
-                      child: _saving
-                          ? SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  cs.onTertiary,
-                                ),
-                              ),
-                            )
-                          : Text(
-                              widget.isEditing
-                                  ? 'Save changes'
-                                  : 'Log transaction',
+                    const SizedBox(height: Spacing.lg),
+                    Row(
+                      children: [
+                        // Only for a fresh log — "add another" mid-edit of
+                        // an existing transaction doesn't make sense.
+                        if (!widget.isEditing) ...[
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: _saving
+                                  ? null
+                                  : () => _submit(addAnother: true),
+                              child: const Text('Save & add another'),
                             ),
+                          ),
+                          const SizedBox(width: Spacing.md),
+                        ],
+                        Expanded(
+                          flex: widget.isEditing ? 1 : 2,
+                          child: FilledButton(
+                            onPressed: _saving ? null : () => _submit(),
+                            child: _saving
+                                ? SizedBox(
+                                    height: IconSize.md,
+                                    width: IconSize.md,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        cs.onTertiary,
+                                      ),
+                                    ),
+                                  )
+                                : Text(
+                                    widget.isEditing
+                                        ? 'Save changes'
+                                        : 'Log transaction',
+                                  ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -382,7 +482,7 @@ class _TypeToggle extends StatelessWidget {
         : semantics.incomeInk;
 
     return Container(
-      padding: EdgeInsets.all(Spacing.xs),
+      padding: const EdgeInsets.all(Spacing.xs),
       decoration: BoxDecoration(
         color: cs.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(AppRadius.pill),
@@ -397,7 +497,7 @@ class _TypeToggle extends StatelessWidget {
                 child: AnimatedContainer(
                   duration: AppMotion.quick,
                   curve: AppMotion.standardCurve,
-                  padding: EdgeInsets.symmetric(vertical: Spacing.sm),
+                  padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
                   decoration: BoxDecoration(
                     // A raised neutral pill carries the selection; the semantic
                     // colour is applied to the label instead. Filling the whole
@@ -417,12 +517,12 @@ class _TypeToggle extends StatelessWidget {
                         option == TransactionType.expense
                             ? Icons.arrow_outward
                             : Icons.south_west,
-                        size: 18,
+                        size: IconSize.smMd,
                         color: type == option
                             ? accentFor(option)
                             : cs.onSurfaceVariant,
                       ),
-                      SizedBox(width: Spacing.sm),
+                      const SizedBox(width: Spacing.sm),
                       Text(
                         option == TransactionType.expense
                             ? 'Expense'
@@ -440,6 +540,45 @@ class _TypeToggle extends StatelessWidget {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// A row of round-number amount chips — tapping one fills the amount field
+/// instead of typing it out, for the common case of a round-ish spend.
+class _QuickAmountRow extends StatelessWidget {
+  const _QuickAmountRow({
+    required this.currencySymbol,
+    required this.onSelected,
+  });
+
+  final String currencySymbol;
+  final ValueChanged<double> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    return SizedBox(
+      height: 32,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: _kQuickAmounts.length,
+        separatorBuilder: (_, _) => const SizedBox(width: Spacing.sm),
+        itemBuilder: (context, index) {
+          final amount = _kQuickAmounts[index];
+          return ActionChip(
+            onPressed: () => onSelected(amount),
+            label: Text('$currencySymbol${amount.toStringAsFixed(0)}'),
+            labelStyle: theme.textTheme.labelSmall?.copyWith(
+              color: cs.onSurfaceVariant,
+            ),
+            visualDensity: VisualDensity.compact,
+            padding: const EdgeInsets.symmetric(horizontal: Spacing.sm),
+          );
+        },
       ),
     );
   }
@@ -465,7 +604,11 @@ class _DateChip extends StatelessWidget {
 
     return ActionChip(
       onPressed: onTap,
-      avatar: Icon(Icons.calendar_today, size: 16, color: cs.onSurfaceVariant),
+      avatar: Icon(
+        Icons.calendar_today,
+        size: IconSize.sm,
+        color: cs.onSurfaceVariant,
+      ),
       label: Text(label),
       labelStyle: theme.textTheme.labelMedium,
     );
@@ -493,12 +636,19 @@ class _DateChip extends StatelessWidget {
 class _CategoryGrid extends StatelessWidget {
   const _CategoryGrid({
     required this.categories,
+    required this.recentNames,
     required this.selected,
     required this.showError,
     required this.onSelected,
   });
 
   final List<CategoryRecord> categories;
+
+  /// Most-recently-used category names, most recent first — see
+  /// `recentCategoryNamesProvider`. Rendered as a shortcut row above the
+  /// full grid so the common case (the same few categories, over and over)
+  /// doesn't need a scroll every time.
+  final List<String> recentNames;
   final CategoryRecord? selected;
   final bool showError;
   final ValueChanged<CategoryRecord> onSelected;
@@ -508,17 +658,22 @@ class _CategoryGrid extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
 
+    // Preserve recency order; a category can be renamed/deleted since it
+    // was last used, so drop names no longer in the live list.
+    final byName = {for (final c in categories) c.name: c};
+    final recent = [for (final name in recentNames) ?byName[name]];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
         Padding(
-          padding: EdgeInsets.symmetric(horizontal: Spacing.lg),
+          padding: const EdgeInsets.symmetric(horizontal: Spacing.lg),
           child: Row(
             children: [
               Text('Category', style: theme.textTheme.titleSmall),
               if (showError) ...[
-                SizedBox(width: Spacing.sm),
+                const SizedBox(width: Spacing.sm),
                 Text(
                   'Pick one',
                   style: theme.textTheme.bodySmall?.copyWith(color: cs.error),
@@ -527,11 +682,43 @@ class _CategoryGrid extends StatelessWidget {
             ],
           ),
         ),
-        SizedBox(height: Spacing.md),
+        if (recent.isNotEmpty) ...[
+          const SizedBox(height: Spacing.sm),
+          SizedBox(
+            height: 36,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: Spacing.lg),
+              itemCount: recent.length,
+              separatorBuilder: (_, _) => const SizedBox(width: Spacing.sm),
+              itemBuilder: (context, index) {
+                final category = recent[index];
+                final isSelected = category.id == selected?.id;
+                return ActionChip(
+                  onPressed: () => onSelected(category),
+                  avatar: Icon(
+                    categoryIcon(category.iconId),
+                    size: IconSize.sm,
+                    color: isSelected ? cs.onPrimary : cs.onSurfaceVariant,
+                  ),
+                  label: Text(category.name),
+                  labelStyle: theme.textTheme.labelSmall?.copyWith(
+                    color: isSelected ? cs.onPrimary : cs.onSurfaceVariant,
+                  ),
+                  backgroundColor: isSelected
+                      ? cs.primary
+                      : cs.surfaceContainerHigh,
+                  side: BorderSide.none,
+                );
+              },
+            ),
+          ),
+        ],
+        const SizedBox(height: Spacing.md),
         Flexible(
           child: GridView.builder(
             shrinkWrap: true,
-            padding: EdgeInsets.symmetric(horizontal: Spacing.lg),
+            padding: const EdgeInsets.symmetric(horizontal: Spacing.lg),
             gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
               maxCrossAxisExtent: 92,
               mainAxisSpacing: 8,
@@ -586,14 +773,14 @@ class _CategoryCell extends StatelessWidget {
           children: [
             Icon(
               categoryIcon(category.iconId),
-              size: 24,
+              size: IconSize.lg,
               color: selected ? cs.onPrimary : cs.onSurfaceVariant,
             ),
-            SizedBox(height: Spacing.xs),
+            const SizedBox(height: Spacing.xs),
             Padding(
               // Tight, so "Entertainment" fits on one line instead of
               // breaking a single trailing letter onto a second.
-              padding: EdgeInsets.symmetric(horizontal: Spacing.xxs),
+              padding: const EdgeInsets.symmetric(horizontal: Spacing.xxs),
               child: Text(
                 category.name,
                 // Two lines: names like "Bills & Utilities" and "Rent &

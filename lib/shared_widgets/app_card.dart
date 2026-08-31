@@ -23,8 +23,8 @@ class AppCard extends StatelessWidget {
     this.padding,
     this.onTap,
     this.color,
-  })  : gradient = null,
-        _elevated = false;
+  }) : gradient = null,
+       _elevated = false;
 
   /// A screen's focal point: gradient fill plus a gold glow. At most one per
   /// screen — the glow is the app's loudest signal, and two of them means
@@ -35,8 +35,8 @@ class AppCard extends StatelessWidget {
     required this.gradient,
     this.padding,
     this.onTap,
-  })  : color = null,
-        _elevated = true;
+  }) : color = null,
+       _elevated = true;
 
   final Widget child;
   final EdgeInsetsGeometry? padding;
@@ -52,7 +52,7 @@ class AppCard extends StatelessWidget {
     final radius = BorderRadius.circular(AppRadius.lg);
 
     final content = Padding(
-      padding: padding ?? EdgeInsets.all(Spacing.lg),
+      padding: padding ?? const EdgeInsets.all(Spacing.lg),
       child: child,
     );
 
