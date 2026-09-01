@@ -631,9 +631,8 @@ class ProfileScreen extends ConsumerWidget {
       await restoreBackup(data);
       _invalidateEverything(ref);
       if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Backup restored.')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Backup restored.')));
     } catch (_) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

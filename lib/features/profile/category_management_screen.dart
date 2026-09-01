@@ -439,9 +439,8 @@ class _CategoryEditorDialogState extends State<_CategoryEditorDialog> {
                 }
               }
             }
-            Navigator.of(
-              context,
-            ).pop((name: name, iconId: _iconId, budget: budget));
+            Navigator.of(context)
+                .pop((name: name, iconId: _iconId, budget: budget));
           },
           child: const Text('Save'),
         ),

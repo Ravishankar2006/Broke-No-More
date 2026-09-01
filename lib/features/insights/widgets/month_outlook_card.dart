@@ -131,9 +131,8 @@ class _OutlookRow extends StatelessWidget {
         Expanded(
           child: Text(
             text,
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: color),
+            style: Theme.of(context).textTheme.bodySmall
+                ?.copyWith(color: color),
           ),
         ),
       ],

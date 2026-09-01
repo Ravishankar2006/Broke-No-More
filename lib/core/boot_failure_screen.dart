@@ -62,9 +62,8 @@ class BootFailureScreen extends StatelessWidget {
                     textAlign: TextAlign.center,
                     maxLines: 4,
                     overflow: TextOverflow.ellipsis,
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodySmall?.copyWith(fontFamily: 'monospace'),
+                    style: Theme.of(context).textTheme.bodySmall
+                        ?.copyWith(fontFamily: 'monospace'),
                   ),
                   const SizedBox(height: Spacing.xl),
                   FilledButton(

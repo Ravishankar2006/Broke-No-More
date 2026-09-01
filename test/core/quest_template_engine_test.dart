@@ -265,27 +265,24 @@ void main() {
       },
     );
 
-    test(
-      'fills remaining slots with general candidates when few categories offend',
-      () {
-        final priorWeek = today.subtract(const Duration(days: 14));
-        final transactions = [
-          _expense('Food', 100, priorWeek),
-          _expense('Food', 500, today.subtract(const Duration(days: 1))),
-        ];
+    test('fills remaining slots with general candidates when few categories offend', () {
+      final priorWeek = today.subtract(const Duration(days: 14));
+      final transactions = [
+        _expense('Food', 100, priorWeek),
+        _expense('Food', 500, today.subtract(const Duration(days: 1))),
+      ];
 
-        final candidates = generateQuestCandidates(
-          allTransactions: transactions,
-          currentStreak: 3,
-          now: today,
-          maxCandidates: 3,
-        );
+      final candidates = generateQuestCandidates(
+        allTransactions: transactions,
+        currentStreak: 3,
+        now: today,
+        maxCandidates: 3,
+      );
 
-        expect(candidates, hasLength(3));
-        expect(candidates.where((c) => c.category == 'Food'), hasLength(1));
-        expect(candidates.where((c) => c.category == null), hasLength(2));
-      },
-    );
+      expect(candidates, hasLength(3));
+      expect(candidates.where((c) => c.category == 'Food'), hasLength(1));
+      expect(candidates.where((c) => c.category == null), hasLength(2));
+    });
 
     test('never exceeds maxCandidates even with many offending categories', () {
       final priorWeek = today.subtract(const Duration(days: 14));

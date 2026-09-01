@@ -109,9 +109,8 @@ class _CategoryBreakdownState extends State<CategoryBreakdown> {
                 onTap: () => widget.onCategoryTap(entry.key),
                 borderRadius: BorderRadius.circular(AppRadius.sm),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: Spacing.xs,
-                  ).copyWith(bottom: Spacing.sm),
+                  padding: const EdgeInsets.symmetric(vertical: Spacing.xs)
+                      .copyWith(bottom: Spacing.sm),
                   child: Row(
                     children: [
                       Container(

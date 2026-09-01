@@ -193,9 +193,8 @@ void main() {
         sortOrder: 0,
       ),
     );
-    await Hive.box<dynamic>(
-      HiveBoxes.appState,
-    ).put(kSeededCategoryIdsKey, ['seed-expense-0']);
+    await Hive.box<dynamic>(HiveBoxes.appState)
+        .put(kSeededCategoryIdsKey, ['seed-expense-0']);
 
     final json = buildBackupJson();
     final data = backupFromJson(json);

@@ -348,9 +348,8 @@ void main() {
           endDate: DateTime.now().subtract(const Duration(days: 1)),
           status: QuestStatus.completed,
         );
-        await Hive.box<Quest>(
-          HiveBoxes.quests,
-        ).put(alreadyCompleted.id, alreadyCompleted);
+        await Hive.box<Quest>(HiveBoxes.quests)
+            .put(alreadyCompleted.id, alreadyCompleted);
 
         await repo.expireOverdueQuests();
 

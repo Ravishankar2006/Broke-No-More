@@ -44,9 +44,8 @@ final activeQuestsProvider = Provider<List<Quest>>((ref) {
 final questCandidatesProvider = Provider<List<QuestCandidate>>((ref) {
   final transactions = ref.watch(transactionsProvider);
   final currentStreak = ref.watch(profileProvider)?.currentStreak ?? 0;
-  final currencySymbol = currencyInfoFor(
-    ref.watch(currentCurrencyCodeProvider),
-  ).symbol;
+  final currencySymbol = currencyInfoFor(ref.watch(currentCurrencyCodeProvider))
+      .symbol;
   ref.watch(questsProvider);
   return ref
       .watch(questRepositoryProvider)

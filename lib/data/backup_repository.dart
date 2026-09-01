@@ -88,7 +88,6 @@ Future<void> restoreBackup(BackupData data) async {
       .map((c) => c.id)
       .where((id) => id.startsWith('seed-'))
       .toList();
-  await Hive.box<dynamic>(
-    HiveBoxes.appState,
-  ).put(kSeededCategoryIdsKey, restoredSeedIds);
+  await Hive.box<dynamic>(HiveBoxes.appState)
+      .put(kSeededCategoryIdsKey, restoredSeedIds);
 }

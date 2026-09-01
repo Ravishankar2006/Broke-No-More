@@ -187,9 +187,8 @@ void main() {
       joinDate: joinDate,
       monthlyBudget: 3000,
     );
-    await Hive.box<UserProfile>(
-      HiveBoxes.profile,
-    ).put(kLocalProfileKey, profile);
+    await Hive.box<UserProfile>(HiveBoxes.profile)
+        .put(kLocalProfileKey, profile);
     await TransactionRepository().putAll(buildTransactions());
     for (final q in buildQuests()) {
       await Hive.box<Quest>(HiveBoxes.quests).put(q.id, q);

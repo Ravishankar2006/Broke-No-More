@@ -123,6 +123,14 @@ void main() {
   testWidgets('a category targeted by an active quest shows the quest flag', (
     tester,
   ) async {
+    // Default 800x600 test surface leaves the category legend below the
+    // fold with the gamification strip and month-outlook card above it —
+    // grow it rather than fight the scroll view (same reasoning as the
+    // drill-down test above).
+    tester.view.physicalSize = const Size(400, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
     await tester.pumpWidget(
       ProviderScope(
         child: MaterialApp(theme: AppTheme.light, home: const InsightsScreen()),

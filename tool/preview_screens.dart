@@ -51,9 +51,9 @@ Future<void> _seed() async {
     ),
   );
 
-  final categories = Hive.box<CategoryRecord>(
-    HiveBoxes.categories,
-  ).values.where((c) => c.type == TransactionType.expense).toList();
+  final categories = Hive.box<CategoryRecord>(HiveBoxes.categories).values
+      .where((c) => c.type == TransactionType.expense)
+      .toList();
 
   var i = 0;
   for (final offset in [0, 0, 1, 2, 4, 5, 5, 6, 8, 9, 11, 12]) {
